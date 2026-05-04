@@ -8,7 +8,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   setDoc,
   serverTimestamp,
   arrayUnion,
@@ -23,6 +22,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { User, Raffle, Order, DashboardRaffle } from "../types";
+
 export type { DashboardRaffle } from "../types";
 
 const ADMIN_EMAIL = "ggrifasadm@gmail.com";
@@ -38,7 +38,6 @@ export const registerUser = async (
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
   const finalRole: User["role"] = email === ADMIN_EMAIL ? "admin" : role;
-
   const userData: User = { id: uid, email, name, role: finalRole };
   await setDoc(doc(db, "users", uid), {
     ...userData,
@@ -67,16 +66,25 @@ export const fetchUserProfile = async (uid: string): Promise<User | null> => {
   return snap.exists() ? (snap.data() as User) : null;
 };
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+export const tsToDate = (ts: unknown): Date => {
+  if (!ts) return new Date();
+  if (ts instanceof Timestamp) return ts.toDate();
+  if (typeof ts === "string") return new Date(ts);
+  return new Date();
+};
+
 // ─── RAFFLES ─────────────────────────────────────────────────────────────────
 
+// Simple collection fetch — no composite index needed
 export const getRaffles = async (): Promise<Raffle[]> => {
-  const q = query(
-    collection(db, "raffles"),
-    where("status", "in", ["active", "finished"]),
-    orderBy("createdAt", "desc")
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Raffle));
+  const snap = await getDocs(collection(db, "raffles"));
+  const all = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Raffle));
+  // sort client-side
+  return all
+    .filter((r) => r.status === "active" || r.status === "finished")
+    .sort((a, b) => tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime());
 };
 
 export const getRaffle = async (id: string): Promise<Raffle | null> => {
@@ -137,23 +145,25 @@ export const confirmOrderPayment = async (
 };
 
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
-  const q = query(
-    collection(db, "orders"),
-    where("userId", "==", userId),
-    orderBy("createdAt", "desc")
-  );
+  // single-field where — no composite index needed
+  const q = query(collection(db, "orders"), where("userId", "==", userId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Order));
+  const orders = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Order));
+  return orders.sort(
+    (a, b) => tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+  );
 };
 
 export const getRaffleOrders = async (raffleId: string): Promise<Order[]> => {
+  // single-field where — no composite index needed
   const q = query(
     collection(db, "orders"),
-    where("raffleId", "==", raffleId),
-    where("status", "==", "paid")
+    where("raffleId", "==", raffleId)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Order));
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Order))
+    .filter((o) => o.status === "paid");
 };
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
@@ -161,29 +171,35 @@ export const getRaffleOrders = async (raffleId: string): Promise<Order[]> => {
 export const getCreatorDashboard = async (
   creatorId: string
 ): Promise<DashboardRaffle[]> => {
+  // single-field where — no composite index needed
   const q = query(
     collection(db, "raffles"),
-    where("creatorId", "==", creatorId),
-    orderBy("createdAt", "desc")
+    where("creatorId", "==", creatorId)
   );
   const raffleSnap = await getDocs(q);
-  const raffles = raffleSnap.docs.map(
-    (d) => ({ ...d.data(), id: d.id } as Raffle)
-  );
+  const raffles = raffleSnap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Raffle))
+    .sort(
+      (a, b) =>
+        tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+    );
 
   return Promise.all(
     raffles.map(async (raffle) => {
       const oq = query(
         collection(db, "orders"),
-        where("raffleId", "==", raffle.id),
-        where("status", "==", "paid")
+        where("raffleId", "==", raffle.id)
       );
       const oSnap = await getDocs(oq);
-      const totalArrecadado = oSnap.docs.reduce(
-        (sum, d) => sum + (d.data().totalAmount as number),
+      const paid = oSnap.docs
+        .map((d) => d.data())
+        .filter((o) => o.status === "paid");
+      const totalArrecadado = paid.reduce(
+        (sum, d) => sum + (d.totalAmount as number),
         0
       );
-      const comissao = totalArrecadado * ((raffle.commissionPercentage ?? 10) / 100);
+      const comissao =
+        totalArrecadado * ((raffle.commissionPercentage ?? 10) / 100);
       const lucro = totalArrecadado - comissao;
       return { ...raffle, totalArrecadado, comissao, lucro };
     })
@@ -198,17 +214,23 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const getAllRaffles = async (): Promise<Raffle[]> => {
-  const snap = await getDocs(
-    query(collection(db, "raffles"), orderBy("createdAt", "desc"))
-  );
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Raffle));
+  const snap = await getDocs(collection(db, "raffles"));
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Raffle))
+    .sort(
+      (a, b) =>
+        tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+    );
 };
 
 export const getAllOrders = async (): Promise<Order[]> => {
-  const snap = await getDocs(
-    query(collection(db, "orders"), orderBy("createdAt", "desc"))
-  );
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Order));
+  const snap = await getDocs(collection(db, "orders"));
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Order))
+    .sort(
+      (a, b) =>
+        tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+    );
 };
 
 export const updateUserRole = async (userId: string, role: User["role"]) => {
@@ -224,13 +246,4 @@ export const getCommissionRate = async (): Promise<number> => {
 
 export const setCommissionRate = async (rate: number) => {
   await setDoc(doc(db, "settings", "commission"), { rate });
-};
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-export const tsToDate = (ts: unknown): Date => {
-  if (!ts) return new Date();
-  if (ts instanceof Timestamp) return ts.toDate();
-  if (typeof ts === "string") return new Date(ts);
-  return new Date();
 };
