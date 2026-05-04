@@ -1,40 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  Ticket,
-  Calendar,
-  ShieldCheck,
-  Share2,
-  ShoppingCart,
-  CheckCircle2,
-  Wallet,
-  X,
-  Sparkles,
-  ArrowLeft,
-  Zap,
-  Copy,
-  QrCode,
-  RefreshCw,
-  Users,
+  Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
+  CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
+  Copy, QrCode, RefreshCw, Users, FlaskConical, Trophy,
+  CreditCard, Loader2,
 } from "lucide-react";
 import { Raffle, User, Order } from "../types";
 import {
-  getRaffle,
-  createOrder,
-  confirmOrderPayment,
-  getRaffleOrders,
-  tsToDate,
+  getRaffle, createOrder, confirmOrderPayment,
+  getRaffleOrders, cancelPendingOrder, tsToDate,
 } from "../lib/firebaseService";
 
-interface RaffleDetailProps {
-  user: User | null;
-}
+interface Props { user: User | null }
+type ModalStep = "choose" | "pix_sim" | "mp_redirect" | "confirming" | "success";
 
-type ModalStep = "pix" | "confirming" | "success";
-
-export default function RaffleDetail({ user }: RaffleDetailProps) {
+export default function RaffleDetail({ user }: Props) {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -43,59 +27,125 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [quickQty, setQuickQty] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [mpLoading, setMpLoading] = useState(false);
   const navigate = useNavigate();
 
-  const loadRaffle = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!id) return;
-    const [data, orderData] = await Promise.all([
-      getRaffle(id),
-      getRaffleOrders(id),
-    ]);
-    setRaffle(data);
-    setOrders(orderData);
+    const [r, o] = await Promise.all([getRaffle(id), getRaffleOrders(id)]);
+    setRaffle(r);
+    setOrders(o);
   }, [id]);
 
+  useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
+
+  // Retorno do Mercado Pago
   useEffect(() => {
-    loadRaffle().finally(() => setLoading(false));
-  }, [loadRaffle]);
+    const mpStatus = searchParams.get("mp_status");
+    const orderId = searchParams.get("order_id");
+    if (!mpStatus || !orderId) return;
+
+    if (mpStatus === "approved") {
+      setPendingOrderId(orderId);
+      // Confirma via webhook — aqui só atualizamos a UI
+      setModal("success");
+      load();
+    } else if (mpStatus === "failure") {
+      cancelPendingOrder(orderId).catch(() => {});
+      alert("Pagamento não aprovado. Tente novamente.");
+    }
+    // Limpa params da URL
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [searchParams]);
 
   const toggleNumber = (num: number) => {
-    if (!raffle) return;
-    if (raffle.soldNumbers.includes(num)) return;
-    setSelectedNumbers((prev) =>
-      prev.includes(num) ? prev.filter((n) => n !== num) : [...prev, num]
+    if (!raffle || raffle.soldNumbers.includes(num)) return;
+    setSelectedNumbers((p) =>
+      p.includes(num) ? p.filter((n) => n !== num) : [...p, num]
     );
   };
 
   const quickPick = () => {
     if (!raffle) return;
-    const available = Array.from({ length: raffle.totalNumbers }, (_, i) => i + 1).filter(
-      (n) => !raffle.soldNumbers.includes(n) && !selectedNumbers.includes(n)
-    );
+    const available = Array.from({ length: raffle.totalNumbers }, (_, i) => i + 1)
+      .filter((n) => !raffle.soldNumbers.includes(n) && !selectedNumbers.includes(n));
     const picks: number[] = [];
     for (let i = 0; i < quickQty && available.length > 0; i++) {
-      const idx = Math.floor(Math.random() * available.length);
-      picks.push(available.splice(idx, 1)[0]);
+      picks.push(available.splice(Math.floor(Math.random() * available.length), 1)[0]);
     }
-    setSelectedNumbers((prev) => [...new Set([...prev, ...picks])]);
+    setSelectedNumbers((p) => [...new Set([...p, ...picks])]);
   };
 
   const handleBuy = async () => {
     if (!user) { navigate("/login"); return; }
     if (!raffle || selectedNumbers.length === 0) return;
-    const total = selectedNumbers.length * raffle.pricePerNumber;
-    const orderId = await createOrder(raffle.id, user.id, selectedNumbers, total);
-    setPendingOrderId(orderId);
-    setModal("pix");
+    setModal("choose");
   };
 
-  const handleConfirmPayment = async () => {
+  // ── Simulação (rifas de teste) ────────────────────────────────────────────
+
+  const handleSimPayment = async () => {
+    if (!raffle || !user) return;
+    const total = selectedNumbers.length * raffle.pricePerNumber;
+    const orderId = await createOrder(
+      raffle.id, raffle.title, user.id, user.name, selectedNumbers, total
+    );
+    setPendingOrderId(orderId);
+    setModal("pix_sim");
+  };
+
+  const handleConfirmSim = async () => {
     if (!pendingOrderId || !raffle) return;
     setModal("confirming");
     await confirmOrderPayment(pendingOrderId, raffle.id, selectedNumbers);
-    await loadRaffle();
+    await load();
     setSelectedNumbers([]);
     setModal("success");
+  };
+
+  // ── Mercado Pago (rifas reais) ────────────────────────────────────────────
+
+  const handleMpPayment = async () => {
+    if (!raffle || !user) return;
+    setMpLoading(true);
+    const total = selectedNumbers.length * raffle.pricePerNumber;
+
+    // Cria pedido pendente primeiro
+    const orderId = await createOrder(
+      raffle.id, raffle.title, user.id, user.name, selectedNumbers, total
+    );
+    setPendingOrderId(orderId);
+    setModal("mp_redirect");
+
+    try {
+      const res = await fetch("/api/mp-preference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          raffleId: raffle.id,
+          raffleTitle: raffle.title,
+          quantity: selectedNumbers.length,
+          unitPrice: raffle.pricePerNumber,
+          payerEmail: user.email,
+          payerName: user.name,
+          commissionPercentage: raffle.commissionPercentage,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error("URL de checkout não recebida.");
+      }
+    } catch (err) {
+      cancelPendingOrder(orderId).catch(() => {});
+      setModal(null);
+      alert("Erro ao iniciar pagamento. Tente novamente.");
+    } finally {
+      setMpLoading(false);
+    }
   };
 
   const copyPixKey = () => {
@@ -115,60 +165,89 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
   if (loading)
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 text-sm font-medium">Carregando sorteio...</p>
-        </div>
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
 
   if (!raffle)
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-6 px-4">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4">
         <Ticket size={48} className="text-slate-700" />
         <p className="text-slate-400 font-bold text-xl">Sorteio não encontrado</p>
-        <Link to="/" className="text-indigo-400 font-bold hover:underline">
-          ← Voltar para Home
-        </Link>
+        <Link to="/" className="text-indigo-400 font-bold hover:underline">← Voltar</Link>
       </div>
     );
 
-  const progress =
-    raffle.totalNumbers > 0
-      ? (raffle.soldNumbers.length / raffle.totalNumbers) * 100
-      : 0;
+  const progress = raffle.totalNumbers > 0
+    ? (raffle.soldNumbers.length / raffle.totalNumbers) * 100 : 0;
   const totalSelected = selectedNumbers.length * raffle.pricePerNumber;
   const img = raffle.images?.[0] ?? `https://picsum.photos/seed/${raffle.id}/800/600`;
-
-  // Build unique participant count
   const participantIds = new Set(orders.map((o) => o.userId));
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 md:py-14">
-      {/* Back */}
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-slate-500 hover:text-white font-bold transition-all group mb-8"
       >
-        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 group-hover:border-slate-600 transition-all">
+        <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 group-hover:border-slate-600">
           <ArrowLeft size={16} />
         </div>
         <span className="text-sm uppercase tracking-widest">Voltar</span>
       </button>
 
+      {/* Test badge */}
+      {raffle.isTest && (
+        <div className="mb-6 flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-5 py-3 rounded-2xl w-fit">
+          <FlaskConical size={16} className="text-amber-400" />
+          <span className="text-xs font-black text-amber-400 uppercase tracking-widest">
+            Rifa de Simulação — Nenhum pagamento real será cobrado
+          </span>
+        </div>
+      )}
+
+      {/* Winner banner */}
+      {raffle.status === "finished" && raffle.winnerNumber && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 p-6 bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/30 rounded-3xl flex flex-col sm:flex-row items-center gap-4"
+        >
+          <div className="w-16 h-16 bg-yellow-500/20 rounded-2xl flex items-center justify-center shrink-0">
+            <Trophy size={32} className="text-yellow-400" />
+          </div>
+          <div className="text-center sm:text-left">
+            <p className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mb-1">
+              Sorteio Realizado em{" "}
+              {tsToDate(raffle.drawnAt).toLocaleDateString("pt-BR")}
+            </p>
+            <p className="text-2xl font-black text-white">
+              🏆 Ganhador:{" "}
+              <span className="text-yellow-400">{raffle.winnerName}</span>
+            </p>
+            <p className="text-slate-400 font-bold">
+              Número Sorteado:{" "}
+              <span className="text-white font-black">
+                #{String(raffle.winnerNumber).padStart(3, "0")}
+              </span>
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-        {/* ── LEFT ───────────────────────────────────────────────────── */}
+        {/* ── LEFT ──────────────────────────────────────────────────── */}
         <div className="lg:col-span-8 space-y-8">
-          {/* Info Card */}
+          {/* Info */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-900/50 rounded-[2.5rem] border border-slate-800 p-8 md:p-12 relative overflow-hidden backdrop-blur-sm"
+            className="bg-slate-900/50 rounded-[2.5rem] border border-slate-800 p-8 md:p-12 relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/5 rounded-full blur-[80px]" />
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-5">
               <div className="bg-indigo-600/10 p-2 rounded-lg text-indigo-400 border border-indigo-500/20">
-                <Ticket size={20} />
+                <Ticket size={18} />
               </div>
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
                 Sorteio Exclusivo
@@ -179,113 +258,101 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
                 </span>
               )}
             </div>
-
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-6 tracking-tight leading-none">
+            <h1 className="text-3xl sm:text-4xl font-black text-white mb-5 tracking-tight leading-none">
               {raffle.title}
             </h1>
-
-            <div className="flex flex-wrap gap-3 mb-8">
-              <div className="flex items-center gap-2 bg-slate-950 px-4 py-2.5 rounded-2xl border border-slate-800">
-                <Calendar size={16} className="text-indigo-500" />
+            <div className="flex flex-wrap gap-3 mb-7">
+              <div className="flex items-center gap-2 bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800">
+                <Calendar size={14} className="text-indigo-500" />
                 <span className="text-sm font-bold text-slate-300">
                   {tsToDate(raffle.drawDate).toLocaleDateString("pt-BR")}
                 </span>
               </div>
-              <div className="flex items-center gap-2 bg-indigo-600/10 px-4 py-2.5 rounded-2xl border border-indigo-600/20">
-                <Wallet size={16} className="text-indigo-400" />
+              <div className="flex items-center gap-2 bg-indigo-600/10 px-4 py-2.5 rounded-xl border border-indigo-600/20">
+                <Wallet size={14} className="text-indigo-400" />
                 <span className="text-base font-black text-indigo-400">
                   R$ {raffle.pricePerNumber.toFixed(2)} / cota
                 </span>
               </div>
-              <div className="flex items-center gap-2 bg-slate-950 px-4 py-2.5 rounded-2xl border border-slate-800">
-                <Users size={16} className="text-emerald-400" />
+              <div className="flex items-center gap-2 bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800">
+                <Users size={14} className="text-emerald-400" />
                 <span className="text-sm font-bold text-slate-300">
                   {participantIds.size} participantes
                 </span>
               </div>
             </div>
-
-            <p className="text-slate-400 font-medium text-base leading-relaxed mb-10 border-l-4 border-indigo-600 pl-6">
+            <p className="text-slate-400 font-medium leading-relaxed mb-8 border-l-4 border-indigo-600 pl-5 text-sm sm:text-base">
               {raffle.description}
             </p>
-
-            {/* Progress Bar */}
-            <div className="space-y-3">
+            {/* Progress */}
+            <div className="space-y-2">
               <div className="flex justify-between items-end">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                  Progresso das Cotas
+                  Progresso
                 </span>
-                <span className="text-2xl font-black text-white">
+                <span className="text-xl font-black text-white">
                   {progress.toFixed(0)}%
                 </span>
               </div>
-              <div className="h-5 bg-slate-950 rounded-full border border-slate-800 p-1 shadow-inner">
+              <div className="h-4 bg-slate-950 rounded-full border border-slate-800 p-0.5">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                  className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full shadow-lg shadow-indigo-600/30"
+                  transition={{ duration: 1.2, ease: "easeOut" }}
+                  className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
                 />
               </div>
-              <div className="flex items-center justify-between text-[10px] font-black tracking-widest uppercase text-slate-500">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                  <span>{raffle.soldNumbers.length} vendidas</span>
-                </div>
+              <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-slate-600">
+                <span>{raffle.soldNumbers.length} vendidas</span>
                 <span>Meta: {raffle.totalNumbers}</span>
               </div>
             </div>
           </motion.div>
 
           {/* Number Grid */}
-          <div className="bg-slate-900 rounded-[2.5rem] border border-slate-800 p-8 md:p-12">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+          <div className="bg-slate-900 rounded-[2.5rem] border border-slate-800 p-8 md:p-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
               <div>
-                <h2 className="text-2xl font-black text-white mb-1">
+                <h2 className="text-xl font-black text-white mb-1">
                   Quadro de{" "}
                   <span className="text-indigo-400 italic">Números</span>
                 </h2>
-                <p className="text-slate-500 font-medium text-sm">
-                  Clique para selecionar suas cotas da sorte.
+                <p className="text-slate-500 text-sm">
+                  Clique para selecionar suas cotas.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-widest">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <div className="w-3 h-3 bg-slate-800 rounded border border-slate-700" />
-                  <span>Livre</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-indigo-400">
-                  <div className="w-3 h-3 bg-indigo-600 rounded" />
-                  <span>Selecionado</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-slate-600">
-                  <div className="w-3 h-3 bg-slate-950 rounded border border-slate-800" />
-                  <span>Vendido</span>
-                </div>
+                {[
+                  { color: "bg-slate-800 border border-slate-700", label: "Livre" },
+                  { color: "bg-indigo-600", label: "Selecionado" },
+                  { color: "bg-slate-950 border border-slate-900", label: "Vendido" },
+                ].map((l) => (
+                  <div key={l.label} className="flex items-center gap-1.5 text-slate-400">
+                    <div className={`w-3 h-3 rounded ${l.color}`} />
+                    <span>{l.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Quick Pick */}
             {raffle.status === "active" && (
-              <div className="flex items-center gap-3 mb-6 p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                <Zap size={16} className="text-indigo-400 shrink-0" />
+              <div className="flex items-center gap-3 mb-5 p-3 bg-slate-950 rounded-xl border border-slate-800 flex-wrap">
+                <Zap size={15} className="text-indigo-400 shrink-0" />
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
                   Compra Rápida:
                 </span>
                 <select
                   value={quickQty}
                   onChange={(e) => setQuickQty(Number(e.target.value))}
-                  className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white outline-none"
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white outline-none"
                 >
-                  {[1, 5, 10, 25, 50].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? "cota" : "cotas"}
-                    </option>
+                  {[1, 5, 10, 25, 50, 100].map((n) => (
+                    <option key={n} value={n}>{n} {n === 1 ? "cota" : "cotas"}</option>
                   ))}
                 </select>
                 <button
                   onClick={quickPick}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-xl text-xs font-black transition-all"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-black transition-all"
                 >
                   Sortear!
                 </button>
@@ -305,20 +372,23 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
                 const num = i + 1;
                 const isSold = raffle.soldNumbers.includes(num);
                 const isSelected = selectedNumbers.includes(num);
+                const isWinner = raffle.winnerNumber === num;
                 return (
                   <button
                     key={num}
                     disabled={isSold || raffle.status === "finished"}
                     onClick={() => toggleNumber(num)}
                     className={`aspect-square rounded-xl text-[10px] font-black transition-all flex items-center justify-center
-                      ${isSold
+                      ${isWinner
+                        ? "bg-yellow-500 text-slate-900 shadow-lg shadow-yellow-500/30 scale-110"
+                        : isSold
                         ? "bg-slate-950 text-slate-700 cursor-not-allowed border border-slate-900"
                         : isSelected
                         ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-110 z-10"
-                        : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700 hover:scale-105 active:scale-95 cursor-pointer"
+                        : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700 hover:scale-105 active:scale-95"
                       }`}
                   >
-                    {num.toString().padStart(raffle.totalNumbers >= 100 ? 3 : 2, "0")}
+                    {isWinner ? "🏆" : num.toString().padStart(raffle.totalNumbers >= 100 ? 3 : 2, "0")}
                   </button>
                 );
               })}
@@ -326,71 +396,64 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
           </div>
         </div>
 
-        {/* ── RIGHT (Sticky Cart) ─────────────────────────────────────── */}
+        {/* ── RIGHT (Cart) ──────────────────────────────────────────── */}
         <div className="lg:col-span-4 lg:sticky lg:top-24 h-fit space-y-6">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             className="bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl overflow-hidden"
           >
-            <div className="relative h-56 sm:h-64">
-              <img
-                src={img}
-                alt={raffle.title}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+            <div className="relative h-52 sm:h-60">
+              <img src={img} alt={raffle.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
               <div className="absolute top-4 left-4 flex items-center gap-2 bg-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl">
                 <Sparkles size={12} />
-                <span>Prêmio Principal</span>
+                <span>Prêmio</span>
               </div>
+              {raffle.isTest && (
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-amber-500 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-slate-900">
+                  <FlaskConical size={12} />
+                  TESTE
+                </div>
+              )}
             </div>
 
-            <div className="p-8 space-y-6">
-              {/* Cart Summary */}
-              <div className="flex items-center justify-between pb-5 border-b border-slate-800">
+            <div className="p-7 space-y-5">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="bg-indigo-600/10 p-2.5 rounded-xl text-indigo-400 border border-indigo-500/20">
-                    <ShoppingCart size={20} />
+                    <ShoppingCart size={18} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      Carrinho
-                    </p>
-                    <p className="text-lg font-black text-white">
-                      {selectedNumbers.length} cotas
-                    </p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carrinho</p>
+                    <p className="text-lg font-black text-white">{selectedNumbers.length} cotas</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Total
-                  </p>
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total</p>
                   <p className="text-xl font-black text-indigo-400">
                     R$ {totalSelected.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
 
-              {/* Selected chips */}
-              <div className="min-h-[36px] max-h-28 overflow-y-auto custom-scrollbar flex flex-wrap gap-1.5">
+              <div className="min-h-[32px] max-h-24 overflow-y-auto custom-scrollbar flex flex-wrap gap-1.5">
                 <AnimatePresence>
                   {selectedNumbers.length > 0 ? (
                     selectedNumbers.map((num) => (
                       <motion.button
                         key={num}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
                         onClick={() => toggleNumber(num)}
-                        className="bg-slate-950 text-indigo-400 px-2.5 py-1 rounded-lg text-[10px] font-black border border-indigo-500/20 hover:border-red-500/30 hover:text-red-400 transition-colors"
+                        className="bg-slate-950 text-indigo-400 px-2.5 py-1 rounded-lg text-[10px] font-black border border-indigo-500/20 hover:text-red-400 transition-colors"
                       >
                         #{num.toString().padStart(3, "0")}
                       </motion.button>
                     ))
                   ) : (
-                    <p className="text-slate-600 text-xs font-bold italic w-full text-center py-2">
+                    <p className="text-slate-600 text-xs font-bold italic w-full text-center py-1">
                       Nenhum número selecionado
                     </p>
                   )}
@@ -401,30 +464,30 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
                 <button
                   disabled={selectedNumbers.length === 0}
                   onClick={handleBuy}
-                  className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-3"
+                  className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-3"
                 >
-                  <Wallet size={22} />
-                  <span>FINALIZAR COMPRA</span>
+                  <Wallet size={20} />
+                  FINALIZAR COMPRA
                 </button>
               ) : (
-                <div className="w-full bg-slate-800 text-slate-500 py-5 rounded-2xl font-black text-base text-center border border-slate-700">
-                  Sorteio Encerrado
+                <div className="w-full bg-slate-800 text-slate-500 py-4 rounded-2xl font-black text-base text-center border border-slate-700">
+                  {raffle.status === "finished" ? "Sorteio Encerrado" : "Indisponível"}
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2 text-slate-600">
-                  <ShieldCheck size={14} />
+                  <ShieldCheck size={13} />
                   <p className="text-[10px] font-bold uppercase tracking-widest">
-                    Pagamento Seguro via PIX
+                    {raffle.isTest ? "Modo Simulação" : "Pagamento Seguro"}
                   </p>
                 </div>
                 <button
                   onClick={shareRaffle}
                   className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-400 transition-colors uppercase tracking-widest"
                 >
-                  <Share2 size={14} />
-                  <span>Partilhar</span>
+                  <Share2 size={13} />
+                  Partilhar
                 </button>
               </div>
             </div>
@@ -432,139 +495,142 @@ export default function RaffleDetail({ user }: RaffleDetailProps) {
         </div>
       </div>
 
-      {/* ── PIX / Payment Modal ─────────────────────────────────────── */}
+      {/* ── MODALS ────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {modal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-xl">
             <motion.div
               initial={{ scale: 0.92, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 20 }}
+              exit={{ scale: 0.92, opacity: 0 }}
               className="bg-slate-900 w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-800"
             >
-              {/* PIX Step */}
-              {modal === "pix" && (
-                <div className="p-8 sm:p-10 space-y-6">
+
+              {/* ── Escolha forma de pagamento (rifas reais) ── */}
+              {modal === "choose" && (
+                <div className="p-8 space-y-5">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-white">
-                      Pagamento via{" "}
-                      <span className="text-indigo-400">PIX</span>
-                    </h2>
-                    <button
-                      onClick={() => setModal(null)}
-                      className="text-slate-500 hover:text-white transition-colors"
-                    >
-                      <X size={24} />
+                    <h2 className="text-xl font-black text-white">Forma de Pagamento</h2>
+                    <button onClick={() => setModal(null)} className="text-slate-500 hover:text-white">
+                      <X size={22} />
                     </button>
                   </div>
-
-                  <div className="bg-slate-950 rounded-3xl p-6 text-center border border-slate-800 space-y-4">
-                    <div className="w-36 h-36 mx-auto bg-white rounded-2xl flex items-center justify-center shadow-lg">
-                      <QrCode size={100} className="text-slate-900" />
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Escaneie o QR Code ou use a chave PIX abaixo
+                  <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 text-center">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total a pagar</p>
+                    <p className="text-3xl font-black text-indigo-400">
+                      R$ {totalSelected.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </p>
+                    <p className="text-xs text-slate-500 mt-1">{selectedNumbers.length} cota(s)</p>
                   </div>
 
-                  <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 flex items-center justify-between gap-3">
+                  {raffle.isTest ? (
+                    <button
+                      onClick={handleSimPayment}
+                      className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3"
+                    >
+                      <FlaskConical size={22} />
+                      SIMULAR PAGAMENTO
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleMpPayment}
+                        disabled={mpLoading}
+                        className="w-full bg-[#00b1ea] hover:bg-[#009fd4] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      >
+                        {mpLoading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
+                        PAGAR COM MERCADO PAGO
+                      </button>
+                      <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                        PIX · Cartão · Boleto — Split automático
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── PIX Simulação ── */}
+              {modal === "pix_sim" && (
+                <div className="p-8 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-black text-white">
+                      <span className="text-amber-400">Simulação</span> — PIX
+                    </h2>
+                    <button onClick={() => setModal(null)} className="text-slate-500 hover:text-white"><X size={22} /></button>
+                  </div>
+                  <div className="bg-slate-950 rounded-2xl p-5 text-center border border-amber-500/20 space-y-3">
+                    <div className="w-32 h-32 mx-auto bg-white rounded-2xl flex items-center justify-center shadow">
+                      <QrCode size={90} className="text-slate-900" />
+                    </div>
+                    <p className="text-xs text-amber-400 font-bold">⚠️ QR Code de simulação — não é real</p>
+                  </div>
+                  <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                        Chave PIX
-                      </p>
-                      <p className="text-sm font-bold text-indigo-400">
-                        ggrifas@financeiro.com.br
-                      </p>
+                      <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Chave PIX (simulada)</p>
+                      <p className="text-sm font-bold text-indigo-400">ggrifas@financeiro.com.br</p>
                     </div>
                     <button
                       onClick={copyPixKey}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                        copied
-                          ? "bg-emerald-600 text-white"
-                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                      }`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black transition-all ${copied ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}`}
                     >
-                      {copied ? (
-                        <CheckCircle2 size={14} />
-                      ) : (
-                        <Copy size={14} />
-                      )}
+                      {copied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
                       {copied ? "Copiado!" : "Copiar"}
                     </button>
                   </div>
-
-                  <div className="bg-indigo-600/10 rounded-2xl p-4 border border-indigo-500/20 text-center">
-                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
-                      Valor a pagar
-                    </p>
-                    <p className="text-3xl font-black text-indigo-400">
-                      R${" "}
-                      {totalSelected.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {selectedNumbers.length} cota(s) ×{" "}
-                      R$ {raffle.pricePerNumber.toFixed(2)}
+                  <div className="bg-indigo-600/10 rounded-xl p-4 border border-indigo-500/20 text-center">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Valor</p>
+                    <p className="text-2xl font-black text-indigo-400">
+                      R$ {totalSelected.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </p>
                   </div>
-
                   <button
-                    onClick={handleConfirmPayment}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-600/20 transition-all hover:scale-[1.01] flex items-center justify-center gap-3"
+                    onClick={handleConfirmSim}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3"
                   >
                     <CheckCircle2 size={22} />
-                    <span>JÁ PAGUEI – CONFIRMAR</span>
+                    JÁ PAGUEI — CONFIRMAR
                   </button>
-                  <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                    Seus números serão reservados após a confirmação
-                  </p>
                 </div>
               )}
 
-              {/* Confirming Step */}
+              {/* ── Redirecionando para MP ── */}
+              {modal === "mp_redirect" && (
+                <div className="p-10 text-center space-y-5">
+                  <div className="w-20 h-20 mx-auto bg-[#00b1ea]/10 rounded-3xl flex items-center justify-center">
+                    <Loader2 size={40} className="text-[#00b1ea] animate-spin" />
+                  </div>
+                  <h2 className="text-xl font-black text-white">Redirecionando para o Mercado Pago...</h2>
+                  <p className="text-slate-500 text-sm">Você será redirecionado para concluir o pagamento com segurança.</p>
+                </div>
+              )}
+
+              {/* ── Confirmando ── */}
               {modal === "confirming" && (
-                <div className="p-10 text-center space-y-6">
-                  <div className="w-20 h-20 mx-auto bg-indigo-600/10 rounded-3xl flex items-center justify-center border border-indigo-500/20">
+                <div className="p-10 text-center space-y-5">
+                  <div className="w-20 h-20 mx-auto bg-indigo-600/10 rounded-3xl flex items-center justify-center">
                     <RefreshCw size={40} className="text-indigo-400 animate-spin" />
                   </div>
-                  <h2 className="text-2xl font-black text-white">
-                    Confirmando pagamento...
-                  </h2>
-                  <p className="text-slate-500 font-medium">
-                    Aguarde enquanto validamos sua transação.
-                  </p>
+                  <h2 className="text-xl font-black text-white">Confirmando pagamento...</h2>
                 </div>
               )}
 
-              {/* Success Step */}
+              {/* ── Sucesso ── */}
               {modal === "success" && (
-                <div className="p-8 sm:p-10 text-center space-y-6">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[50px]" />
-                  <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20 border border-emerald-500/20">
+                <div className="p-8 text-center space-y-5">
+                  <div className="w-24 h-24 bg-emerald-500/10 text-emerald-400 rounded-[2rem] flex items-center justify-center mx-auto border border-emerald-500/20">
                     <CheckCircle2 size={52} />
                   </div>
-                  <h2 className="text-3xl font-black text-white tracking-tight">
-                    Cotas Confirmadas!{" "}
-                    <span className="text-emerald-500 italic">🎉</span>
-                  </h2>
-                  <p className="text-slate-500 font-medium leading-relaxed">
-                    Seus números foram reservados com sucesso. Boa sorte no
-                    sorteio!
+                  <h2 className="text-3xl font-black text-white">Cotas Confirmadas! 🎉</h2>
+                  <p className="text-slate-500 font-medium text-sm leading-relaxed">
+                    Seus números foram reservados com sucesso. Boa sorte no sorteio!
                   </p>
-
-                  <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 text-left">
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                      Protocolo
-                    </p>
-                    <p className="text-xs font-mono text-indigo-400 break-all">
-                      {pendingOrderId}
-                    </p>
+                  <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-left">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Protocolo</p>
+                    <p className="text-xs font-mono text-indigo-400 break-all">{pendingOrderId}</p>
                   </div>
-
                   <button
                     onClick={() => setModal(null)}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-white py-5 rounded-2xl font-black text-lg transition-all border border-slate-700"
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black text-base transition-all border border-slate-700"
                   >
                     FECHAR
                   </button>
