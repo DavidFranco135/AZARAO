@@ -27,6 +27,15 @@ export type { DashboardRaffle } from "../types";
 
 const ADMIN_EMAIL = "ggrifasadm@gmail.com";
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+export const tsToDate = (ts: unknown): Date => {
+  if (!ts) return new Date();
+  if (ts instanceof Timestamp) return ts.toDate();
+  if (typeof ts === "string") return new Date(ts);
+  return new Date();
+};
+
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export const registerUser = async (
@@ -66,25 +75,17 @@ export const fetchUserProfile = async (uid: string): Promise<User | null> => {
   return snap.exists() ? (snap.data() as User) : null;
 };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-export const tsToDate = (ts: unknown): Date => {
-  if (!ts) return new Date();
-  if (ts instanceof Timestamp) return ts.toDate();
-  if (typeof ts === "string") return new Date(ts);
-  return new Date();
-};
-
 // ─── RAFFLES ─────────────────────────────────────────────────────────────────
 
-// Simple collection fetch — no composite index needed
 export const getRaffles = async (): Promise<Raffle[]> => {
   const snap = await getDocs(collection(db, "raffles"));
-  const all = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Raffle));
-  // sort client-side
-  return all
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Raffle))
     .filter((r) => r.status === "active" || r.status === "finished")
-    .sort((a, b) => tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime());
+    .sort(
+      (a, b) =>
+        tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+    );
 };
 
 export const getRaffle = async (id: string): Promise<Raffle | null> => {
@@ -112,17 +113,68 @@ export const deleteRaffle = async (id: string) => {
   await deleteDoc(doc(db, "raffles", id));
 };
 
+// ─── SORTEIO (DRAW) ──────────────────────────────────────────────────────────
+
+/**
+ * Realiza o sorteio: sorteia aleatoriamente um número entre os vendidos,
+ * busca quem comprou esse número e salva o resultado na rifa.
+ */
+export const performDraw = async (raffleId: string): Promise<{
+  winnerNumber: number;
+  winnerId: string;
+  winnerName: string;
+}> => {
+  const raffle = await getRaffle(raffleId);
+  if (!raffle) throw new Error("Rifa não encontrada.");
+  if (raffle.soldNumbers.length === 0)
+    throw new Error("Nenhum número vendido ainda.");
+
+  // Sorteia número aleatório entre os vendidos
+  const idx = Math.floor(Math.random() * raffle.soldNumbers.length);
+  const winnerNumber = raffle.soldNumbers[idx];
+
+  // Encontra o pedido que contém esse número
+  const q = query(
+    collection(db, "orders"),
+    where("raffleId", "==", raffleId)
+  );
+  const ordersSnap = await getDocs(q);
+  const winnerOrder = ordersSnap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Order))
+    .filter((o) => o.status === "paid")
+    .find((o) => o.numbers.includes(winnerNumber));
+
+  if (!winnerOrder) throw new Error("Pedido do ganhador não encontrado.");
+
+  const winnerName = winnerOrder.userName ?? "Participante";
+
+  // Salva resultado na rifa e encerra
+  await updateDoc(doc(db, "raffles", raffleId), {
+    status: "finished",
+    winnerNumber,
+    winnerId: winnerOrder.userId,
+    winnerName,
+    drawnAt: serverTimestamp(),
+  });
+
+  return { winnerNumber, winnerId: winnerOrder.userId, winnerName };
+};
+
 // ─── ORDERS ──────────────────────────────────────────────────────────────────
 
 export const createOrder = async (
   raffleId: string,
+  raffleTitle: string,
   userId: string,
+  userName: string,
   numbers: number[],
   totalAmount: number
 ): Promise<string> => {
   const ref = await addDoc(collection(db, "orders"), {
     raffleId,
+    raffleTitle,
     userId,
+    userName,
     numbers,
     totalAmount,
     status: "pending",
@@ -134,10 +186,14 @@ export const createOrder = async (
 export const confirmOrderPayment = async (
   orderId: string,
   raffleId: string,
-  numbers: number[]
+  numbers: number[],
+  mpPaymentId?: string
 ) => {
   const batch = writeBatch(db);
-  batch.update(doc(db, "orders", orderId), { status: "paid" });
+  batch.update(doc(db, "orders", orderId), {
+    status: "paid",
+    ...(mpPaymentId ? { mpPaymentId } : {}),
+  });
   batch.update(doc(db, "raffles", raffleId), {
     soldNumbers: arrayUnion(...numbers),
   });
@@ -145,17 +201,17 @@ export const confirmOrderPayment = async (
 };
 
 export const getUserOrders = async (userId: string): Promise<Order[]> => {
-  // single-field where — no composite index needed
   const q = query(collection(db, "orders"), where("userId", "==", userId));
   const snap = await getDocs(q);
-  const orders = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Order));
-  return orders.sort(
-    (a, b) => tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
-  );
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id } as Order))
+    .sort(
+      (a, b) =>
+        tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
+    );
 };
 
 export const getRaffleOrders = async (raffleId: string): Promise<Order[]> => {
-  // single-field where — no composite index needed
   const q = query(
     collection(db, "orders"),
     where("raffleId", "==", raffleId)
@@ -166,12 +222,15 @@ export const getRaffleOrders = async (raffleId: string): Promise<Order[]> => {
     .filter((o) => o.status === "paid");
 };
 
+export const cancelPendingOrder = async (orderId: string) => {
+  await deleteDoc(doc(db, "orders", orderId));
+};
+
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 export const getCreatorDashboard = async (
   creatorId: string
 ): Promise<DashboardRaffle[]> => {
-  // single-field where — no composite index needed
   const q = query(
     collection(db, "raffles"),
     where("creatorId", "==", creatorId)
