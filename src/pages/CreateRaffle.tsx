@@ -122,10 +122,11 @@ export default function CreateRaffle({ user }: CreateRaffleProps) {
     }
   };
 
-  const estimatedProfit =
-    parseFloat(pricePerNumber || "0") *
-    parseInt(totalNumbers) *
-    (1 - commissionRate / 100);
+  const price = parseFloat(pricePerNumber) || 0;
+  const qty = parseInt(totalNumbers) || 0;
+  const rate = Math.min(Math.max(Number(commissionRate) || 10, 0), 99);
+  const grossTotal = price * qty;
+  const estimatedProfit = grossTotal * (1 - rate / 100);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12">
@@ -455,9 +456,7 @@ export default function CreateRaffle({ user }: CreateRaffleProps) {
                   </span>
                   <span className="text-sm font-bold text-slate-300">
                     R${" "}
-                    {(
-                      parseFloat(pricePerNumber || "0") * parseInt(totalNumbers)
-                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {grossTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between pt-3 border-t border-slate-800">
