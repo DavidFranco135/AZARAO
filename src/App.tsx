@@ -85,7 +85,7 @@ export default function App() {
               <a href="#" className="hover:text-indigo-400 transition-colors">Suporte</a>
             </div>
             <div className="pt-7 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} GGRIFAS SaaS. Todos os direitos reservados.
+              © {new Date().getFullYear()} NIKLAUS. Todos os direitos reservados.
             </div>
           </div>
         </footer>
