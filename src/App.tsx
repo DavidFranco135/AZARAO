@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import CreateRaffle from "./pages/CreateRaffle";
 import AdminPanel from "./pages/AdminPanel";
 import MyOrders from "./pages/MyOrders";
+import RaffleManage from "./pages/RaffleManage";
 import { User } from "./types";
 
 export default function App() {
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="/my-orders" element={user ? <MyOrders user={user} /> : <Navigate to="/login" />} />
               <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
               <Route path="/create-raffle" element={user ? <CreateRaffle user={user} /> : <Navigate to="/login" />} />
+              <Route path="/dashboard/raffle/:id" element={user ? <RaffleManage user={user} /> : <Navigate to="/login" />} />
               <Route path="/admin" element={user?.role === "admin" ? <AdminPanel user={user} /> : <Navigate to="/" />} />
             </Routes>
           </AnimatePresence>
@@ -80,12 +82,12 @@ export default function App() {
               Infraestrutura profissional para lançar sorteios online com automação total de pagamentos.
             </p>
             <div className="flex justify-center flex-wrap gap-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-7">
-              <a href="#" className="hover:text-indigo-400 transition-colors">Termos de Uso</a>
-              <a href="#" className="hover:text-indigo-400 transition-colors">Privacidade</a>
-              <a href="#" className="hover:text-indigo-400 transition-colors">Suporte</a>
+              <a href="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</a>
+              <a href="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</a>
+              <a href="mailto:ggrifasadm@gmail.com" className="hover:text-indigo-400 transition-colors">Suporte</a>
             </div>
             <div className="pt-7 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} NIKLAUS. Todos os direitos reservados.
+              © {new Date().getFullYear()} GGRIFAS SaaS. Todos os direitos reservados.
             </div>
           </div>
         </footer>
