@@ -42,17 +42,29 @@ export const registerUser = async (
   email: string,
   password: string,
   name: string,
-  role: "user" | "creator"
+  role: "user" | "creator",
+  phone?: string,
+  cpf?: string,
 ): Promise<User> => {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
   const finalRole: User["role"] = email === ADMIN_EMAIL ? "admin" : role;
-  const userData: User = { id: uid, email, name, role: finalRole };
+  const profileComplete = !!(phone && cpf);
+  const userData: User = { id: uid, email, name, role: finalRole, phone, cpf, profileComplete };
   await setDoc(doc(db, "users", uid), {
     ...userData,
     createdAt: serverTimestamp(),
   });
   return userData;
+};
+
+/** Atualiza perfil do usuário (phone, cpf) */
+export const updateUserProfile = async (
+  uid: string,
+  data: { phone?: string; cpf?: string }
+): Promise<void> => {
+  const profileComplete = !!(data.phone && data.cpf);
+  await updateDoc(doc(db, "users", uid), { ...data, profileComplete });
 };
 
 export const loginUser = async (
@@ -168,7 +180,9 @@ export const createOrder = async (
   userId: string,
   userName: string,
   numbers: number[],
-  totalAmount: number
+  totalAmount: number,
+  userPhone?: string,
+  userCpf?: string,
 ): Promise<string> => {
   const ref = await addDoc(collection(db, "orders"), {
     raffleId,
@@ -178,6 +192,8 @@ export const createOrder = async (
     numbers,
     totalAmount,
     status: "pending",
+    ...(userPhone ? { userPhone } : {}),
+    ...(userCpf ? { userCpf } : {}),
     createdAt: serverTimestamp(),
   });
   return ref.id;
