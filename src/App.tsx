@@ -56,7 +56,7 @@ export default function App() {
         <main className="flex-grow">
           <AnimatePresence mode="wait">
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Home user={user} />} />
               <Route path="/login" element={user ? <Navigate to="/" /> : <Auth mode="login" onAuth={setUser} />} />
               <Route path="/register" element={user ? <Navigate to="/" /> : <Auth mode="register" onAuth={setUser} />} />
               <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <Auth mode="forgot" onAuth={setUser} />} />
@@ -87,7 +87,7 @@ export default function App() {
               <a href="mailto:ggrifasadm@gmail.com" className="hover:text-indigo-400 transition-colors">Suporte</a>
             </div>
             <div className="pt-7 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} NIKLAUS. Todos os direitos reservados.
+              © {new Date().getFullYear()} GGRIFAS SaaS. Todos os direitos reservados.
             </div>
           </div>
         </footer>
