@@ -216,19 +216,23 @@ export default function Auth({ mode, onAuth }: AuthProps) {
               )}
 
               {mode !== "forgot" && (
-                <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <div
-                      onClick={() => setAcceptedTerms(!acceptedTerms)}
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all cursor-pointer ${acceptedTerms ? "bg-emerald-500 border-emerald-500" : "border-slate-600 hover:border-slate-400"}`}
-                    >
+                <div className={`p-4 rounded-2xl border ${role === "creator" ? "bg-amber-500/5 border-amber-500/20" : "bg-slate-800/50 border-slate-700"}`}>
+                  <label className="flex items-start gap-3 cursor-pointer" onClick={() => setAcceptedTerms(!acceptedTerms)}>
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all cursor-pointer ${acceptedTerms ? "bg-emerald-500 border-emerald-500" : "border-slate-600 hover:border-slate-400"}`}>
                       {acceptedTerms && <span className="text-white text-xs font-black">✓</span>}
                     </div>
-                    <span className="text-xs text-slate-300 leading-relaxed">
-                      Tenho <strong className="text-white">18 anos ou mais</strong>, li e aceito os{" "}
-                      <Link to="/termos" target="_blank" className="text-indigo-400 hover:underline">Termos de Uso</Link>
-                      {" "}e a{" "}
-                      <Link to="/privacidade" target="_blank" className="text-indigo-400 hover:underline">Política de Privacidade</Link>.
+                    <span className="text-xs text-slate-300 leading-relaxed select-none">
+                      {role === "creator" ? (
+                        <>Tenho <strong className="text-white">18 anos ou mais</strong>, li e aceito os{" "}
+                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline" onClick={e => e.stopPropagation()}>Termos de Uso</a>,
+                        a <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline" onClick={e => e.stopPropagation()}>Política de Privacidade</a> e entendo que
+                        {" "}<strong className="text-amber-400">sou responsável pela legalidade e entrega do prêmio</strong> do sorteio que criar.</>
+                      ) : (
+                        <>Tenho <strong className="text-white">18 anos ou mais</strong>, li e aceito os{" "}
+                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline" onClick={e => e.stopPropagation()}>Termos de Uso</a>
+                        {" "}e a{" "}
+                        <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline" onClick={e => e.stopPropagation()}>Política de Privacidade</a>.</>
+                      )}
                     </span>
                   </label>
                 </div>
