@@ -1,5 +1,6 @@
 /**
- * Cloudflare Pages Function
+ * Cloudflare Pages Function — CORRIGIDO
+ * Arquivo: functions/api/mp-webhook.ts  (raiz do repositório)
  * Rota: POST /api/mp-webhook
  *
  * Recebe notificações de pagamento do Mercado Pago.
