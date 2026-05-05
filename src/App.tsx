@@ -15,15 +15,11 @@ import MyOrders from "./pages/MyOrders";
 import RaffleManage from "./pages/RaffleManage";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-import AgeGate from "./components/AgeGate";
 import { User } from "./types";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ageConfirmed, setAgeConfirmed] = useState(() => {
-    return sessionStorage.getItem("ggrifas_age_ok") === "1";
-  });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -38,18 +34,10 @@ export default function App() {
     return unsub;
   }, []);
 
-  const handleAgeConfirm = () => {
-    sessionStorage.setItem("ggrifas_age_ok", "1");
-    setAgeConfirmed(true);
-  };
-
   const handleLogout = async () => {
     await logoutUser();
     setUser(null);
   };
-
-  if (!ageConfirmed)
-    return <AgeGate onConfirm={handleAgeConfirm} />;
 
   if (loading)
     return (
