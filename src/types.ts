@@ -4,7 +4,9 @@ export interface User {
   name: string;
   role: "admin" | "creator" | "user";
   mpAccessToken?: string;
-  phone?: string; // WhatsApp
+  phone?: string;   // WhatsApp com DDD
+  cpf?: string;     // CPF (apenas dígitos)
+  profileComplete?: boolean; // true quando phone e cpf estão preenchidos
 }
 
 export interface Raffle {
@@ -21,11 +23,7 @@ export interface Raffle {
   commissionPercentage: number;
   soldNumbers: number[];
   createdAt?: unknown;
-
-  // Modo de pagamento
-  isTest: boolean; // true = simulação | false = Mercado Pago real
-
-  // Resultado do sorteio
+  isTest: boolean;
   winnerNumber?: number;
   winnerId?: string;
   winnerName?: string;
@@ -38,10 +36,12 @@ export interface Order {
   raffleTitle?: string;
   userId: string;
   userName?: string;
+  userPhone?: string;
+  userCpf?: string;
   numbers: number[];
   totalAmount: number;
   status: "pending" | "paid";
-  mpPaymentId?: string; // ID do pagamento no Mercado Pago
+  mpPaymentId?: string;
   createdAt?: unknown;
 }
 
