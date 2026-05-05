@@ -313,7 +313,6 @@ export default function CreateRaffle({ user }: { user: User | null }) {
           </div>
         </form>
       </div>
-    </div>
 
       {/* Termos do Criador */}
       {showTerms && (
@@ -322,9 +321,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
           onAccept={() => {
             setTermsAccepted(true);
             setShowTerms(false);
-            // Salva no Firebase que o criador aceitou os termos
             markCreatorTermsAccepted(user.id, rate).catch(() => {});
-            // Re-submit form after accepting
             setTimeout(() => {
               document.getElementById("create-raffle-form")?.dispatchEvent(
                 new Event("submit", { cancelable: true, bubbles: true })
