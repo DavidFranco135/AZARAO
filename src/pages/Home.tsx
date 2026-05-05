@@ -143,7 +143,7 @@ export default function Home() {
             </p>
           </div>
           <Link
-            to="/"
+            to="/#raffles"
             className="text-indigo-400 font-bold flex items-center gap-2 group mx-auto md:mx-0"
           >
             <span>Ver todas</span>
