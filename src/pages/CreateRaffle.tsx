@@ -1,559 +1,507 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import {
-  PlusCircle,
-  Upload,
-  Link as LinkIcon,
-  Calendar,
+  Shield,
+  Users,
   Ticket,
-  ArrowRight,
-  Sparkles,
-  LayoutDashboard,
   DollarSign,
-  FlaskConical,
-  CreditCard,
+  TrendingUp,
+  Trash2,
+  Edit2,
+  Check,
   X,
-  ImageIcon,
-  Loader2,
+  BarChart3,
+  Settings,
+  Eye,
+  RefreshCw,
 } from "lucide-react";
-import { User } from "../types";
-import { createRaffle, getCommissionRate } from "../lib/firebaseService";
-import { uploadImageToImgBB } from "../lib/imgbb";
+import { User, Raffle, Order } from "../types";
+import {
+  getAllUsers,
+  getAllRaffles,
+  getAllOrders,
+  updateUserRole,
+  deleteRaffle,
+  getCommissionRate,
+  setCommissionRate,
+  tsToDate,
+} from "../lib/firebaseService";
 
-interface CreateRaffleProps {
+interface AdminPanelProps {
   user: User | null;
 }
 
-export default function CreateRaffle({ user }: CreateRaffleProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [pricePerNumber, setPricePerNumber] = useState("");
-  const [totalNumbers, setTotalNumbers] = useState("100");
-  const [drawDate, setDrawDate] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageMode, setImageMode] = useState<"url" | "upload">("upload");
-  const [uploading, setUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isTest, setIsTest] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [commissionRate, setCommissionRate] = useState(10);
-  const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
+type Tab = "overview" | "users" | "raffles" | "orders" | "settings";
 
-  useEffect(() => {
-    getCommissionRate().then(setCommissionRate);
-  }, []);
+export default function AdminPanel({ user }: AdminPanelProps) {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [users, setUsers] = useState<User[]>([]);
+  const [raffles, setRaffles] = useState<Raffle[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [commissionRate, setCommissionRateState] = useState(10);
+  const [newRate, setNewRate] = useState("10");
+  const [loading, setLoading] = useState(true);
+  const [savingRate, setSavingRate] = useState(false);
+  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [roleValue, setRoleValue] = useState<User["role"]>("user");
 
-  if (!user || (user.role !== "creator" && user.role !== "admin")) {
+  const load = async () => {
+    setLoading(true);
+    const [u, r, o, rate] = await Promise.all([
+      getAllUsers(),
+      getAllRaffles(),
+      getAllOrders(),
+      getCommissionRate(),
+    ]);
+    setUsers(u);
+    setRaffles(r);
+    setOrders(o);
+    setCommissionRateState(rate);
+    setNewRate(String(rate));
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSaveRate = async () => {
+    setSavingRate(true);
+    await setCommissionRate(Number(newRate));
+    setCommissionRateState(Number(newRate));
+    setSavingRate(false);
+  };
+
+  const handleDeleteRaffle = async (id: string) => {
+    if (!confirm("Excluir esta rifa? Ação irreversível.")) return;
+    await deleteRaffle(id);
+    setRaffles((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleSaveRole = async (userId: string) => {
+    await updateUserRole(userId, roleValue);
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, role: roleValue } : u))
+    );
+    setEditingRole(null);
+  };
+
+  const totalRevenue = orders
+    .filter((o) => o.status === "paid")
+    .reduce((s, o) => s + o.totalAmount, 0);
+  const platformCommission = totalRevenue * (commissionRate / 100);
+
+  if (loading)
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-4 text-center">
-        <Ticket size={48} className="text-slate-700" />
-        <p className="text-slate-400 font-bold text-lg">
-          Apenas criadores podem criar sorteios.
-        </p>
-        <p className="text-slate-500 text-sm">
-          Registre-se como{" "}
-          <strong className="text-indigo-400">Criador</strong> para ter acesso.
-        </p>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
-  }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Preview local imediato
-    const localUrl = URL.createObjectURL(file);
-    setImagePreview(localUrl);
-
-    setUploading(true);
-    setError("");
-    try {
-      const url = await uploadImageToImgBB(file);
-      setImageUrl(url);
-      setImagePreview(url);
-    } catch {
-      setError("Falha no upload da imagem. Tente novamente.");
-      setImagePreview(null);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const clearImage = () => {
-    setImageUrl("");
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!pricePerNumber || parseFloat(pricePerNumber) <= 0) {
-      setError("Informe um valor válido por cota.");
-      return;
-    }
-    if (uploading) {
-      setError("Aguarde o upload da imagem terminar.");
-      return;
-    }
-    setLoading(true);
-    try {
-      await createRaffle({
-        title,
-        description,
-        pricePerNumber: parseFloat(pricePerNumber),
-        totalNumbers: parseInt(totalNumbers),
-        drawDate,
-        images: imageUrl ? [imageUrl] : [],
-        creatorId: user.id,
-        creatorName: user.name,
-        commissionPercentage: commissionRate,
-        isTest,
-      });
-      navigate("/dashboard");
-    } catch {
-      setError("Erro ao criar a rifa. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const price = parseFloat(pricePerNumber) || 0;
-  const qty = parseInt(totalNumbers) || 0;
-  const rate = Math.min(Math.max(Number(commissionRate) || 10, 0), 99);
-  const grossTotal = price * qty;
-  const estimatedProfit = grossTotal * (1 - rate / 100);
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "overview", label: "Visão Geral", icon: <BarChart3 size={16} /> },
+    { id: "users", label: "Usuários", icon: <Users size={16} /> },
+    { id: "raffles", label: "Rifas", icon: <Ticket size={16} /> },
+    { id: "orders", label: "Pedidos", icon: <DollarSign size={16} /> },
+    { id: "settings", label: "Configurações", icon: <Settings size={16} /> },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl overflow-hidden"
-      >
-        {/* Header */}
-        <div className="p-10 md:p-14 border-b border-slate-800 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 text-indigo-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 border border-indigo-500/20">
-              <Sparkles size={13} />
-              <span>Painel do Criador</span>
-            </div>
-            <h1 className="text-3xl sm:text-5xl font-black text-white mb-4">
-              Nova{" "}
-              <span className="text-indigo-500 italic">Oportunidade</span>
+    <div className="max-w-7xl mx-auto px-4 py-10 sm:py-12 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-400 border border-amber-500/20">
+            <Shield size={24} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white">
+              Painel <span className="text-amber-400 italic">Administrativo</span>
             </h1>
-            <p className="text-slate-400 font-medium max-w-xl">
-              Configure sua campanha e escolha o modo de pagamento.
+            <p className="text-slate-500 text-sm font-medium">
+              Bem-vindo, {user?.name} — controle total da plataforma.
             </p>
           </div>
         </div>
+        <button
+          onClick={load}
+          className="flex items-center gap-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all self-start sm:self-auto"
+        >
+          <RefreshCw size={15} />
+          Atualizar
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="p-8 sm:p-12 space-y-10">
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-4 bg-red-500/10 text-red-400 rounded-2xl text-sm font-bold border border-red-500/20"
-            >
-              {error}
-            </motion.div>
-          )}
+      {/* Tabs */}
+      <div className="flex gap-1.5 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto no-scrollbar">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+              tab === t.id
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "text-slate-500 hover:text-white"
+            }`}
+          >
+            {t.icon}
+            <span className="hidden sm:inline">{t.label}</span>
+          </button>
+        ))}
+      </div>
 
-          {/* ── Modo de Pagamento ─────────────────────────────────────── */}
-          <div className="space-y-4">
-            <SectionHeader
-              icon={<CreditCard size={16} />}
-              label="Modo de Pagamento"
+      {/* ── Overview ────────────────────────────────────────────────── */}
+      {tab === "overview" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <AdminStat
+              icon={<Users size={20} />}
+              label="Total de Usuários"
+              value={users.length.toString()}
+              color="bg-indigo-600"
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Live */}
-              <button
-                type="button"
-                onClick={() => setIsTest(false)}
-                className={`p-5 rounded-2xl border-2 text-left transition-all ${
-                  !isTest
-                    ? "border-indigo-500 bg-indigo-500/10"
-                    : "border-slate-800 bg-slate-950 hover:border-slate-700"
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      !isTest ? "border-indigo-500" : "border-slate-600"
-                    }`}
-                  >
-                    {!isTest && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                    )}
-                  </div>
-                  <CreditCard
-                    size={18}
-                    className={!isTest ? "text-indigo-400" : "text-slate-500"}
-                  />
-                  <span
-                    className={`font-black text-sm uppercase tracking-widest ${
-                      !isTest ? "text-white" : "text-slate-500"
-                    }`}
-                  >
-                    Mercado Pago Real
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Pagamentos reais via PIX, cartão e boleto. Split automático
-                  de comissão.
-                </p>
-              </button>
-
-              {/* Test */}
-              <button
-                type="button"
-                onClick={() => setIsTest(true)}
-                className={`p-5 rounded-2xl border-2 text-left transition-all ${
-                  isTest
-                    ? "border-amber-500 bg-amber-500/10"
-                    : "border-slate-800 bg-slate-950 hover:border-slate-700"
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      isTest ? "border-amber-500" : "border-slate-600"
-                    }`}
-                  >
-                    {isTest && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    )}
-                  </div>
-                  <FlaskConical
-                    size={18}
-                    className={isTest ? "text-amber-400" : "text-slate-500"}
-                  />
-                  <span
-                    className={`font-black text-sm uppercase tracking-widest ${
-                      isTest ? "text-amber-400" : "text-slate-500"
-                    }`}
-                  >
-                    Simulação / Teste
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Nenhum pagamento real. Ideal para testar o fluxo completo da
-                  plataforma.
-                </p>
-              </button>
-            </div>
-
-            {isTest && (
-              <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                <FlaskConical size={14} className="text-amber-400 shrink-0" />
-                <p className="text-xs text-amber-300 font-medium">
-                  Esta rifa é um teste — aparecerá com o selo{" "}
-                  <strong>SIMULAÇÃO</strong> para todos os usuários.
-                </p>
-              </div>
-            )}
+            <AdminStat
+              icon={<Ticket size={20} />}
+              label="Total de Rifas"
+              value={raffles.length.toString()}
+              color="bg-emerald-600"
+            />
+            <AdminStat
+              icon={<DollarSign size={20} />}
+              label="Receita Total"
+              value={`R$ ${totalRevenue.toLocaleString("pt-BR")}`}
+              color="bg-amber-500"
+            />
+            <AdminStat
+              icon={<TrendingUp size={20} />}
+              label="Comissão GGRIFAS"
+              value={`R$ ${platformCommission.toLocaleString("pt-BR")}`}
+              color="bg-rose-600"
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* ── Left: Info ─────────────────────────────────────────── */}
-            <div className="space-y-7">
-              <SectionHeader
-                icon={<LayoutDashboard size={16} />}
-                label="Informações Essenciais"
-              />
-
-              <Field label="Título do Sorteio">
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: iPhone 15 Pro Max 256GB"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input-field"
-                />
-              </Field>
-
-              <Field label="Descrição">
-                <textarea
-                  required
-                  placeholder="Descreva o prêmio, regras e informações importantes..."
-                  rows={4}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="input-field resize-none"
-                />
-              </Field>
-
-              {/* Image Upload */}
-              <Field label="Imagem do Prêmio">
-                {/* Tab switcher */}
-                <div className="flex p-1 bg-slate-950 rounded-xl border border-slate-800 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setImageMode("upload")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-                      imageMode === "upload"
-                        ? "bg-indigo-600 text-white"
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                  >
-                    <Upload size={13} />
-                    Do dispositivo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageMode("url")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-                      imageMode === "url"
-                        ? "bg-indigo-600 text-white"
-                        : "text-slate-500 hover:text-slate-300"
-                    }`}
-                  >
-                    <LinkIcon size={13} />
-                    Por URL
-                  </button>
-                </div>
-
-                {imageMode === "upload" ? (
-                  <div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="img-upload"
-                    />
-                    {imagePreview ? (
-                      <div className="relative rounded-2xl overflow-hidden border border-slate-700">
+          {/* Recent activity */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">
+                Rifas Recentes
+              </h3>
+              <div className="space-y-3">
+                {raffles.slice(0, 5).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 shrink-0">
                         <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-40 object-cover"
+                          src={r.images?.[0] ?? `https://picsum.photos/seed/${r.id}/100`}
+                          className="w-full h-full object-cover"
+                          alt=""
+                          referrerPolicy="no-referrer"
                         />
-                        {uploading && (
-                          <div className="absolute inset-0 bg-slate-950/70 flex items-center justify-center gap-2 text-white text-sm font-bold">
-                            <Loader2 size={20} className="animate-spin" />
-                            Enviando...
-                          </div>
-                        )}
-                        {!uploading && (
-                          <button
-                            type="button"
-                            onClick={clearImage}
-                            className="absolute top-2 right-2 bg-slate-900/80 p-1.5 rounded-lg text-white hover:bg-red-600 transition-colors"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
-                    ) : (
-                      <label
-                        htmlFor="img-upload"
-                        className="flex flex-col items-center justify-center gap-3 h-36 border-2 border-dashed border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all"
-                      >
-                        <ImageIcon size={28} className="text-slate-600" />
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-400">
-                            Clique para escolher
-                          </p>
-                          <p className="text-xs text-slate-600">
-                            JPG, PNG ou WEBP — máx. 32MB
-                          </p>
-                        </div>
-                      </label>
-                    )}
-                  </div>
-                ) : (
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="input-field"
-                  />
-                )}
-              </Field>
-            </div>
-
-            {/* ── Right: Finance ─────────────────────────────────────── */}
-            <div className="space-y-7">
-              <SectionHeader
-                icon={<DollarSign size={16} />}
-                label="Configuração Financeira"
-              />
-
-              <div className="grid grid-cols-2 gap-5">
-                <Field label="Valor por Cota (R$)">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="0,00"
-                    value={pricePerNumber}
-                    onChange={(e) => setPricePerNumber(e.target.value)}
-                    className="input-field"
-                  />
-                </Field>
-
-                <Field label="Qtd. de Cotas">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-600">
-                      <Ticket size={14} />
+                      <p className="text-sm font-medium text-slate-300 truncate">
+                        {r.title}
+                      </p>
                     </div>
-                    <select
-                      value={totalNumbers}
-                      onChange={(e) => setTotalNumbers(e.target.value)}
-                      className="input-field pl-10 appearance-none cursor-pointer"
-                    >
-                      {[10, 25, 50, 100, 200, 500, 1000, 5000, 10000].map(
-                        (n) => (
-                          <option key={n} value={n} className="bg-slate-900">
-                            {n}
-                          </option>
-                        )
-                      )}
-                    </select>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ml-2 shrink-0 ${r.status === "active" ? "text-emerald-400" : "text-slate-500"}`}>
+                      {r.status === "active" ? "Ativa" : "Encerrada"}
+                    </span>
                   </div>
-                </Field>
+                ))}
               </div>
-
-              <Field label="Data do Sorteio">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-600">
-                    <Calendar size={14} />
+            </div>
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-4">
+                Pedidos Recentes
+              </h3>
+              <div className="space-y-3">
+                {orders.slice(0, 5).map((o) => (
+                  <div key={o.id} className="flex items-center justify-between">
+                    <p className="text-xs font-mono text-slate-400 truncate">
+                      {o.id.slice(0, 16)}...
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-bold text-white">
+                        R$ {o.totalAmount.toFixed(2)}
+                      </span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${o.status === "paid" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-800 text-slate-500"}`}>
+                        {o.status === "paid" ? "Pago" : "Pendente"}
+                      </span>
+                    </div>
                   </div>
-                  <input
-                    type="date"
-                    required
-                    min={new Date().toISOString().split("T")[0]}
-                    value={drawDate}
-                    onChange={(e) => setDrawDate(e.target.value)}
-                    className="input-field pl-10"
-                  />
-                </div>
-              </Field>
-
-              {/* Financial summary */}
-              <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Taxa Plataforma GGRIFAS
-                  </span>
-                  <span className="text-sm font-bold text-amber-400">
-                    {commissionRate}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Receita Total (100%)
-                  </span>
-                  <span className="text-sm font-bold text-slate-300">
-                    R${" "}
-                    {grossTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                    Seu Lucro Estimado
-                  </span>
-                  <span className="text-2xl font-black text-emerald-400">
-                    R${" "}
-                    {estimatedProfit.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
+                ))}
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="pt-8 border-t border-slate-800">
-            <button
-              type="submit"
-              disabled={loading || uploading}
-              className={`w-full text-white py-5 rounded-2xl font-bold text-xl shadow-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-4 hover:scale-[1.01] active:scale-[0.99] ${
-                isTest
-                  ? "bg-amber-500 hover:bg-amber-400 shadow-amber-500/20"
-                  : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/20"
-              }`}
-            >
-              {loading ? (
-                <Loader2 size={24} className="animate-spin" />
-              ) : (
-                <>
-                  {isTest ? (
-                    <FlaskConical size={24} />
-                  ) : (
-                    <PlusCircle size={24} />
-                  )}
-                  <span>
-                    {isTest ? "CRIAR RIFA DE TESTE" : "LANÇAR SORTEIO AGORA"}
-                  </span>
-                  <ArrowRight size={20} />
-                </>
-              )}
-            </button>
+      {/* ── Users ────────────────────────────────────────────────────── */}
+      {tab === "users" && (
+        <div>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="font-black text-white">Usuários ({users.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-950/30">
+                  <tr>
+                    {["Nome", "E-mail", "Papel", ""].map((h) => (
+                      <th key={h} className="px-5 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-800/20 transition-all">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-xs font-black">
+                            {u.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium text-white">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-slate-400">{u.email}</td>
+                      <td className="px-5 py-4">
+                        {editingRole === u.id ? (
+                          <select
+                            value={roleValue}
+                            onChange={(e) => setRoleValue(e.target.value as User["role"])}
+                            className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white outline-none"
+                          >
+                            {["user", "creator", "admin"].map((r) => (
+                              <option key={r} value={r} className="bg-slate-900">{r}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                            u.role === "admin"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              : u.role === "creator"
+                              ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                              : "bg-slate-800 text-slate-500 border-slate-700"
+                          }`}>
+                            {u.role}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          {editingRole === u.id ? (
+                            <>
+                              <button onClick={() => handleSaveRole(u.id)} className="p-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg hover:bg-emerald-600/30 transition-all">
+                                <Check size={13} />
+                              </button>
+                              <button onClick={() => setEditingRole(null)} className="p-1.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-all">
+                                <X size={13} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingRole(u.id); setRoleValue(u.role); }}
+                              className="p-1.5 text-slate-500 hover:text-white bg-slate-800 rounded-lg border border-slate-700 transition-all"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </form>
-      </motion.div>
+        </div>
+      )}
 
-      <style>{`
-        .input-field {
-          width: 100%;
-          background: rgb(2 6 23);
-          border: 1px solid rgb(30 41 59);
-          border-radius: 0.875rem;
-          padding: 0.875rem 1rem;
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: white;
-          outline: none;
-          transition: all 0.15s;
-        }
-        .input-field:focus { border-color: rgb(99 102 241); box-shadow: 0 0 0 2px rgba(99,102,241,0.1); }
-        .input-field::placeholder { color: rgb(51 65 85); }
-      `}</style>
+      {/* ── Raffles ──────────────────────────────────────────────────── */}
+      {tab === "raffles" && (
+        <div>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            <div className="p-5 border-b border-slate-800">
+              <h3 className="font-black text-white">Todas as Rifas ({raffles.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-950/30">
+                  <tr>
+                    {["Título", "Criador", "Status", "Cotas", "Preço", ""].map((h) => (
+                      <th key={h} className="px-5 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {raffles.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-800/20 transition-all">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 shrink-0">
+                            <img src={r.images?.[0] ?? `https://picsum.photos/seed/${r.id}/100`} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                          </div>
+                          <p className="text-sm font-medium text-white line-clamp-1 max-w-[180px]">{r.title}</p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-slate-400">{r.creatorName ?? "—"}</td>
+                      <td className="px-5 py-4">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${r.status === "active" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-800 text-slate-500"}`}>
+                          {r.status === "active" ? "Ativa" : "Encerrada"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-sm font-bold text-white">
+                        {r.soldNumbers.length}/{r.totalNumbers}
+                      </td>
+                      <td className="px-5 py-4 text-sm font-bold text-indigo-400">
+                        R$ {r.pricePerNumber.toFixed(2)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <Link to={`/raffle/${r.id}`} className="p-1.5 text-slate-500 hover:text-white bg-slate-800 rounded-lg border border-slate-700 transition-all">
+                            <Eye size={13} />
+                          </Link>
+                          <button onClick={() => handleDeleteRaffle(r.id)} className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800 rounded-lg border border-slate-700 transition-all">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Orders ───────────────────────────────────────────────────── */}
+      {tab === "orders" && (
+        <div>
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="font-black text-white">Pedidos ({orders.length})</h3>
+              <p className="text-sm font-bold text-emerald-400">
+                Pago: R$ {totalRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-950/30">
+                  <tr>
+                    {["ID", "Rifas", "Cotas", "Valor", "Status", "Data"].map((h) => (
+                      <th key={h} className="px-5 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {orders.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-800/20 transition-all">
+                      <td className="px-5 py-4 text-xs font-mono text-slate-500">{o.id.slice(0, 12)}...</td>
+                      <td className="px-5 py-4 text-xs text-slate-400">{o.raffleId.slice(0, 10)}...</td>
+                      <td className="px-5 py-4 text-sm font-bold text-white">{o.numbers.length}</td>
+                      <td className="px-5 py-4 text-sm font-bold text-white">R$ {o.totalAmount.toFixed(2)}</td>
+                      <td className="px-5 py-4">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${o.status === "paid" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                          {o.status === "paid" ? "Pago" : "Pendente"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-xs text-slate-500">
+                        {tsToDate(o.createdAt).toLocaleDateString("pt-BR")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Settings ─────────────────────────────────────────────────── */}
+      {tab === "settings" && (
+        <div className="max-w-xl space-y-6">
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8 space-y-6">
+            <h3 className="font-black text-white text-lg">Taxa de Comissão da Plataforma</h3>
+            <p className="text-slate-500 text-sm">
+              Define a % cobrada sobre o valor arrecadado de cada rifa. Atual:{" "}
+              <span className="text-amber-400 font-bold">{commissionRate}%</span>
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  step="0.5"
+                  value={newRate}
+                  onChange={(e) => setNewRate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-bold text-lg outline-none focus:border-indigo-500"
+                />
+                <span className="absolute right-4 inset-y-0 flex items-center text-slate-500 font-bold">
+                  %
+                </span>
+              </div>
+              <button
+                onClick={handleSaveRate}
+                disabled={savingRate}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2 min-w-[100px] justify-center"
+              >
+                <span style={{ display: savingRate ? "none" : "flex" }} className="items-center gap-2">
+                  <Check size={16} /> Salvar
+                </span>
+                <span style={{ display: savingRate ? "flex" : "none" }} className="items-center gap-2">
+                  <RefreshCw size={16} className="animate-spin" /> Salvando...
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8 space-y-4">
+            <h3 className="font-black text-white text-lg">Conta Admin</h3>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-400">
+                <span className="text-slate-500 font-bold">E-mail: </span>
+                {user?.email}
+              </p>
+              <p className="text-sm text-slate-400">
+                <span className="text-slate-500 font-bold">Papel: </span>
+                <span className="text-amber-400 font-black uppercase">
+                  {user?.role}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function SectionHeader({
+function AdminStat({
   icon,
   label,
+  value,
+  color,
 }: {
   icon: React.ReactNode;
   label: string;
+  value: string;
+  color: string;
 }) {
   return (
-    <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
-      <span className="text-indigo-500">{icon}</span>
-      <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-        {label}
-      </h3>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">
-        {label}
-      </label>
-      {children}
+    <div className="bg-slate-900/50 p-5 sm:p-6 rounded-2xl border border-slate-800 space-y-4">
+      <div className={`${color} w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+          {label}
+        </p>
+        <p className="text-xl font-black text-white leading-none">{value}</p>
+      </div>
     </div>
   );
 }
