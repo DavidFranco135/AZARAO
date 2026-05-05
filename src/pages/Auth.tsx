@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { User } from "../types";
 import { registerUser, loginUser, resetPassword } from "../lib/firebaseService";
+import AgeGate from "../components/AgeGate";
 
 type Mode = "login" | "register" | "forgot";
 
@@ -41,6 +42,7 @@ export default function Auth({ mode, onAuth }: AuthProps) {
   const [success,  setSuccess]  = useState("");
   const [loading,  setLoading]  = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(mode !== "register");
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,6 +98,10 @@ export default function Auth({ mode, onAuth }: AuthProps) {
     register:"Preencha seus dados para começar.",
     forgot:  "Informe seu e-mail para redefinir a senha.",
   };
+
+  if (mode === "register" && !ageConfirmed) {
+    return <AgeGate onConfirm={() => setAgeConfirmed(true)} />;
+  }
 
   return (
     <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-950">
