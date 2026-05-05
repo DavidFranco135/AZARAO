@@ -40,7 +40,6 @@ export default function Auth({ mode, onAuth }: AuthProps) {
   const [error,    setError]    = useState("");
   const [success,  setSuccess]  = useState("");
   const [loading,  setLoading]  = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,13 +47,6 @@ export default function Auth({ mode, onAuth }: AuthProps) {
     setLoading(true);
     setError("");
     setSuccess("");
-
-    // Validação dos termos
-    if (mode !== "forgot" && !acceptedTerms) {
-      setError("Você precisa aceitar os Termos de Uso para continuar.");
-      setLoading(false);
-      return;
-    }
 
     try {
       if (mode === "forgot") {
@@ -206,25 +198,6 @@ export default function Auth({ mode, onAuth }: AuthProps) {
                   <Link to="/forgot-password" className="text-xs font-bold text-slate-500 hover:text-indigo-400 transition-colors">
                     Esqueceu a senha?
                   </Link>
-                </div>
-              )}
-
-              {mode !== "forgot" && (
-                <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <div
-                      onClick={() => setAcceptedTerms(!acceptedTerms)}
-                      className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all cursor-pointer ${acceptedTerms ? "bg-emerald-500 border-emerald-500" : "border-slate-600 hover:border-slate-400"}`}
-                    >
-                      {acceptedTerms && <span className="text-white text-xs font-black">✓</span>}
-                    </div>
-                    <span className="text-xs text-slate-300 leading-relaxed">
-                      Tenho <strong className="text-white">18 anos ou mais</strong>, li e aceito os{" "}
-                      <Link to="/termos" target="_blank" className="text-indigo-400 hover:underline">Termos de Uso</Link>
-                      {" "}e a{" "}
-                      <Link to="/privacidade" target="_blank" className="text-indigo-400 hover:underline">Política de Privacidade</Link>.
-                    </span>
-                  </label>
                 </div>
               )}
 
