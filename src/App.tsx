@@ -13,11 +13,17 @@ import CreateRaffle from "./pages/CreateRaffle";
 import AdminPanel from "./pages/AdminPanel";
 import MyOrders from "./pages/MyOrders";
 import RaffleManage from "./pages/RaffleManage";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import AgeGate from "./components/AgeGate";
 import { User } from "./types";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ageConfirmed, setAgeConfirmed] = useState(() => {
+    return sessionStorage.getItem("ggrifas_age_ok") === "1";
+  });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -32,10 +38,18 @@ export default function App() {
     return unsub;
   }, []);
 
+  const handleAgeConfirm = () => {
+    sessionStorage.setItem("ggrifas_age_ok", "1");
+    setAgeConfirmed(true);
+  };
+
   const handleLogout = async () => {
     await logoutUser();
     setUser(null);
   };
+
+  if (!ageConfirmed)
+    return <AgeGate onConfirm={handleAgeConfirm} />;
 
   if (loading)
     return (
@@ -65,6 +79,8 @@ export default function App() {
               <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
               <Route path="/create-raffle" element={user ? <CreateRaffle user={user} /> : <Navigate to="/login" />} />
               <Route path="/dashboard/raffle/:id" element={user ? <RaffleManage user={user} /> : <Navigate to="/login" />} />
+              <Route path="/termos" element={<Terms />} />
+              <Route path="/privacidade" element={<Privacy />} />
               <Route path="/admin" element={user?.role === "admin" ? <AdminPanel user={user} /> : <Navigate to="/" />} />
             </Routes>
           </AnimatePresence>
@@ -82,8 +98,8 @@ export default function App() {
               Infraestrutura profissional para lançar sorteios online com automação total de pagamentos.
             </p>
             <div className="flex justify-center flex-wrap gap-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-7">
-              <a href="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</a>
-              <a href="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</a>
+              <Link to="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link>
+              <Link to="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</Link>
               <a href="mailto:ggrifasadm@gmail.com" className="hover:text-indigo-400 transition-colors">Suporte</a>
             </div>
             <div className="pt-7 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
