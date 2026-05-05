@@ -3,8 +3,10 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft, Trophy, Users, DollarSign, Ticket,
   Calendar, TrendingUp, Hash, CheckCircle2, Clock,
-  Shuffle, Loader2, Eye, BarChart3, FlaskConical,
+  Shuffle, Loader2, Eye, BarChart3, FlaskConical, MessageCircle,
 } from "lucide-react";
+import WhatsAppModal from "../components/WhatsAppModal";
+import { fetchUserProfile } from "../lib/firebaseService";
 import { Raffle, Order, User } from "../types";
 import {
   getRaffle, getRaffleOrders, performDraw, tsToDate,
@@ -18,6 +20,7 @@ export default function RaffleManage({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true);
   const [drawing, setDrawing] = useState(false);
   const [drawResult, setDrawResult] = useState<{ number: number; name: string } | null>(null);
+  const [wpData, setWpData] = useState<{ user: User | null; templateType: "winner"|"payment"|"reminder"|"custom"; order?: Order } | null>(null);
 
   const load = async () => {
     if (!id) return;
@@ -150,6 +153,18 @@ export default function RaffleManage({ user }: { user: User | null }) {
                 {" "}— {raffle.winnerName}
               </p>
             </div>
+            <button
+              onClick={async () => {
+                if (raffle.winnerId) {
+                  const u = await fetchUserProfile(raffle.winnerId);
+                  setWpData({ user: u, templateType: "winner" });
+                }
+              }}
+              className="flex items-center gap-2 bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/30 px-4 py-2 rounded-xl text-xs font-black transition-all ml-auto mt-2 sm:mt-0"
+            >
+              <MessageCircle size={14} />
+              WhatsApp Ganhador
+            </button>
           </div>
         )}
       </div>
@@ -237,6 +252,15 @@ export default function RaffleManage({ user }: { user: User | null }) {
                         R$ {o.totalAmount.toFixed(2)}
                       </td>
                       <td className="px-5 py-4">
+                        <button
+                          onClick={async () => {
+                            const u = await fetchUserProfile(o.userId);
+                            setWpData({ user: u, templateType: o.status === "paid" ? "payment" : "custom", order: o });
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-[#25D366] bg-slate-800 rounded-lg border border-slate-700 transition-all mb-2 block" title="WhatsApp"
+                        >
+                          <MessageCircle size={13} />
+                        </button>
                         <span className={`flex items-center gap-1.5 text-[10px] font-black uppercase w-fit px-2 py-1 rounded-lg border ${
                           o.status === "paid"
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
@@ -319,6 +343,17 @@ export default function RaffleManage({ user }: { user: User | null }) {
           Ver página pública da rifa
         </Link>
       </div>
+
+      {/* WhatsApp Modal */}
+      {wpData && (
+        <WhatsAppModal
+          onClose={() => setWpData(null)}
+          targetUser={wpData.user}
+          raffle={raffle}
+          order={wpData.order}
+          defaultTemplate={wpData.templateType}
+        />
+      )}
 
       {/* Draw result modal */}
       {drawResult && (
