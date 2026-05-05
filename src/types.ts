@@ -3,7 +3,8 @@ export interface User {
   email: string;
   name: string;
   role: "admin" | "creator" | "user";
-  mpAccessToken?: string; // Mercado Pago token do criador (futuro split)
+  mpAccessToken?: string;
+  phone?: string; // WhatsApp
 }
 
 export interface Raffle {
