@@ -32,9 +32,16 @@ export default function RaffleDetail({ user }: Props) {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [r, o] = await Promise.all([getRaffle(id), getRaffleOrders(id)]);
+    // Raffle is always public
+    const r = await getRaffle(id);
     setRaffle(r);
-    setOrders(o);
+    // Orders require login — skip if not authenticated
+    try {
+      const o = await getRaffleOrders(id);
+      setOrders(o);
+    } catch {
+      setOrders([]); // no orders visible if not logged in
+    }
   }, [id]);
 
   useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
