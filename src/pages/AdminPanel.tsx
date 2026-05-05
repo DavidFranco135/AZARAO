@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import {
   Shield, Users, Ticket, DollarSign, TrendingUp,
   Trash2, Edit2, Check, X, BarChart3, Settings,
-  Eye, RefreshCw,
+  Eye, RefreshCw, MessageCircle,
 } from "lucide-react";
+import WhatsAppModal from "../components/WhatsAppModal";
 import { User, Raffle, Order } from "../types";
 import {
   getAllUsers, getAllRaffles, getAllOrders,
@@ -27,6 +28,7 @@ export default function AdminPanel({ user }: AdminPanelProps) {
   const [savedOk, setSavedOk] = useState(false);
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [roleValue, setRoleValue] = useState<User["role"]>("user");
+  const [wpUser, setWpUser] = useState<User | null>(null);
 
   const load = async () => {
     setLoading(true);
