@@ -51,8 +51,11 @@ export const registerUser = async (
   const finalRole: User["role"] = email === ADMIN_EMAIL ? "admin" : role;
   const profileComplete = !!(phone && cpf);
   const userData: User = { id: uid, email, name, role: finalRole, phone, cpf, profileComplete };
+  // Registra aceitação dos termos
   await setDoc(doc(db, "users", uid), {
     ...userData,
+    termsAcceptedAt: serverTimestamp(),
+    termsVersion: "1.0",
     createdAt: serverTimestamp(),
   });
   return userData;
