@@ -35,14 +35,14 @@ export default function Terms() {
           </div>
 
           <Section title="1. Das Partes e Definições">
-            <p><strong className="text-white">GGRIFAS</strong> ("Plataforma") é uma plataforma tecnológica de intermediação que disponibiliza infraestrutura para que terceiros ("Criadores") organizem e divulguem campanhas promocionais ("Sorteios") para usuários participantes ("Participantes").</p>
-            <p>A GGRIFAS <strong className="text-white">NÃO É ORGANIZADORA</strong> dos sorteios. É exclusivamente uma prestadora de serviços tecnológicos, sem qualquer responsabilidade sobre a realização, legalidade, premiação ou resultado dos sorteios criados por terceiros.</p>
+            <p><strong className="text-white">AZARÃO</strong> ("Plataforma") é uma plataforma tecnológica de intermediação que disponibiliza infraestrutura para que terceiros ("Criadores") organizem e divulguem campanhas promocionais ("Sorteios") para usuários participantes ("Participantes").</p>
+            <p>A AZARÃO <strong className="text-white">NÃO É ORGANIZADORA</strong> dos sorteios. É exclusivamente uma prestadora de serviços tecnológicos, sem qualquer responsabilidade sobre a realização, legalidade, premiação ou resultado dos sorteios criados por terceiros.</p>
           </Section>
 
           <Section title="2. Natureza Jurídica dos Sorteios">
-            <p>Os sorteios divulgados nesta plataforma são de inteira responsabilidade dos Criadores. A GGRIFAS não realiza, organiza, financia ou garante qualquer sorteio.</p>
+            <p>Os sorteios divulgados nesta plataforma são de inteira responsabilidade dos Criadores. A AZARÃO não realiza, organiza, financia ou garante qualquer sorteio.</p>
             <p>Nos termos da <strong className="text-white">Lei nº 5.768/1971</strong> e do <strong className="text-white">Decreto nº 70.951/1972</strong>, promoções comerciais com distribuição gratuita de prêmios a título de propaganda podem exigir autorização prévia da SEAE/ME. <strong className="text-white">É obrigação exclusiva do Criador</strong> verificar e obter todas as autorizações legais necessárias antes de publicar qualquer sorteio nesta plataforma.</p>
-            <p>A GGRIFAS se reserva o direito de remover qualquer sorteio que viole a legislação vigente, sem aviso prévio e sem qualquer compensação.</p>
+            <p>A AZARÃO se reserva o direito de remover qualquer sorteio que viole a legislação vigente, sem aviso prévio e sem qualquer compensação.</p>
           </Section>
 
           <Section title="3. Responsabilidades do Criador">
@@ -52,7 +52,7 @@ export default function Terms() {
               <li>É o único responsável pela <strong className="text-white">legalidade do sorteio</strong>, incluindo a obtenção de autorizações junto à SEAE/ME quando exigido por lei;</li>
               <li>O prêmio anunciado <strong className="text-white">existe e será entregue</strong> ao ganhador conforme divulgado;</li>
               <li>Responsabiliza-se por qualquer dano causado a Participantes decorrente de sorteio fraudulento, cancelado ou não realizado;</li>
-              <li>Isenta a GGRIFAS de qualquer responsabilidade civil, administrativa ou criminal decorrente de seus sorteios;</li>
+              <li>Isenta a AZARÃO de qualquer responsabilidade civil, administrativa ou criminal decorrente de seus sorteios;</li>
               <li>Não utilizará a plataforma para fins ilegais, incluindo lavagem de dinheiro, estelionato ou fraude;</li>
               <li>Arcará com eventuais multas, penalidades ou indenizações impostas por autoridades competentes em razão de seus sorteios.</li>
             </ul>
@@ -63,14 +63,14 @@ export default function Terms() {
             <ul className="list-disc pl-5 space-y-2">
               <li>Tem <strong className="text-white">18 anos ou mais</strong>;</li>
               <li>Participa por livre e espontânea vontade, ciente dos riscos;</li>
-              <li>Compreende que a GGRIFAS não garante a entrega do prêmio por parte do Criador;</li>
+              <li>Compreende que a AZARÃO não garante a entrega do prêmio por parte do Criador;</li>
               <li>Em caso de disputa com o Criador, deverá acionar diretamente o Criador e, se necessário, os órgãos de defesa do consumidor (PROCON) ou o Poder Judiciário;</li>
               <li>Forneceu dados verdadeiros no cadastro, especialmente CPF e telefone.</li>
             </ul>
           </Section>
 
-          <Section title="5. Limitação de Responsabilidade da GGRIFAS">
-            <p>A GGRIFAS <strong className="text-white">NÃO SE RESPONSABILIZA</strong> por:</p>
+          <Section title="5. Limitação de Responsabilidade da AZARÃO">
+            <p>A AZARÃO <strong className="text-white">NÃO SE RESPONSABILIZA</strong> por:</p>
             <ul className="list-disc pl-5 space-y-2">
               <li>Não entrega ou não cumprimento de prêmios por parte de Criadores;</li>
               <li>Fraudes praticadas por Criadores ou Participantes;</li>
@@ -79,12 +79,12 @@ export default function Terms() {
               <li>Interrupções no serviço por motivos técnicos, de manutenção ou força maior;</li>
               <li>Perdas financeiras decorrentes da participação em sorteios.</li>
             </ul>
-            <p>A responsabilidade total máxima da GGRIFAS, em qualquer hipótese, fica limitada ao valor das taxas de serviço pagas pelo Criador nos últimos 30 dias.</p>
+            <p>A responsabilidade total máxima da AZARÃO, em qualquer hipótese, fica limitada ao valor das taxas de serviço pagas pelo Criador nos últimos 30 dias.</p>
           </Section>
 
           <Section title="6. Taxa de Serviço e Pagamentos">
-            <p>A GGRIFAS cobra uma <strong className="text-white">taxa de serviço (SaaS Fee)</strong> sobre o valor arrecadado em cada sorteio, conforme percentual definido no momento da criação do sorteio.</p>
-            <p>Os pagamentos são processados por gateways terceiros (ex.: Mercado Pago). A GGRIFAS não armazena dados de cartão de crédito e não é responsável por falhas nos gateways de pagamento.</p>
+            <p>A AZARÃO cobra uma <strong className="text-white">taxa de serviço (SaaS Fee)</strong> sobre o valor arrecadado em cada sorteio, conforme percentual definido no momento da criação do sorteio.</p>
+            <p>Os pagamentos são processados por gateways terceiros (ex.: Mercado Pago). A AZARÃO não armazena dados de cartão de crédito e não é responsável por falhas nos gateways de pagamento.</p>
             <p>Não há reembolso de taxas de serviço já processadas, salvo erro comprovado da plataforma.</p>
           </Section>
 
@@ -117,7 +117,7 @@ export default function Terms() {
           </Section>
 
           <Section title="10. Alterações dos Termos">
-            <p>A GGRIFAS reserva-se o direito de alterar estes Termos a qualquer momento, mediante comunicação prévia aos usuários. O uso continuado da plataforma após a comunicação implica aceitação das novas condições.</p>
+            <p>A AZARÃO reserva-se o direito de alterar estes Termos a qualquer momento, mediante comunicação prévia aos usuários. O uso continuado da plataforma após a comunicação implica aceitação das novas condições.</p>
           </Section>
 
           <div className="p-5 bg-slate-800 rounded-2xl border border-slate-700 mt-6">
@@ -125,7 +125,7 @@ export default function Terms() {
               <Shield size={18} className="text-indigo-400"/>
               <p className="font-black text-white text-sm">Contato e Suporte</p>
             </div>
-            <p>Para dúvidas sobre estes Termos, entre em contato pelo e-mail: <a href="mailto:ggrifasadm@gmail.com" className="text-indigo-400 hover:underline">ggrifasadm@gmail.com</a></p>
+            <p>Para dúvidas sobre estes Termos, entre em contato pelo e-mail: <a href="mailto:azaraoadm@gmail.com" className="text-indigo-400 hover:underline">azaraoadm@gmail.com</a></p>
           </div>
         </div>
       </div>
