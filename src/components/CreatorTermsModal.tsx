@@ -93,7 +93,7 @@ export default function CreatorTermsModal({ commissionRate, onAccept, onDecline 
           style={{ maxHeight: "260px" }}
         >
           <TermsSection title="1. Comissão e Pagamentos">
-            A GGRIFAS cobra uma taxa de serviço de <strong className="text-white">{commissionRate}%</strong> sobre o valor total arrecadado em cada rifa. Esta taxa é calculada automaticamente e descontada antes do repasse ao Criador. Não há cobranças adicionais ocultas. O repasse ao Criador é de responsabilidade do sistema após confirmação dos pagamentos.
+            A AZARÃO cobra uma taxa de serviço de <strong className="text-white">{commissionRate}%</strong> sobre o valor total arrecadado em cada rifa. Esta taxa é calculada automaticamente e descontada antes do repasse ao Criador. Não há cobranças adicionais ocultas. O repasse ao Criador é de responsabilidade do sistema após confirmação dos pagamentos.
           </TermsSection>
 
           <TermsSection title="2. Responsabilidade do Criador">
@@ -109,11 +109,11 @@ export default function CreatorTermsModal({ commissionRate, onAccept, onDecline 
           </TermsSection>
 
           <TermsSection title="5. Conteúdo Proibido">
-            É proibido criar rifas para: arrecadação de dinheiro sem prêmio real (crowdfunding disfarçado), sorteios com prêmios ilegais, lavagem de dinheiro, ou qualquer atividade que viole a legislação brasileira. A GGRIFAS pode remover rifas sem aviso prévio.
+            É proibido criar rifas para: arrecadação de dinheiro sem prêmio real (crowdfunding disfarçado), sorteios com prêmios ilegais, lavagem de dinheiro, ou qualquer atividade que viole a legislação brasileira. A AZARÃO pode remover rifas sem aviso prévio.
           </TermsSection>
 
           <TermsSection title="6. Suspensão e Bloqueio">
-            A GGRIFAS se reserva o direito de <strong className="text-white">suspender a conta</strong> e <strong className="text-white">reter valores</strong> pendentes em caso de: denúncias de fraude, não entrega de prêmio, violação destes Termos ou determinação judicial. Valores retidos poderão ser utilizados para reembolsar participantes lesados.
+            A AZARÃO se reserva o direito de <strong className="text-white">suspender a conta</strong> e <strong className="text-white">reter valores</strong> pendentes em caso de: denúncias de fraude, não entrega de prêmio, violação destes Termos ou determinação judicial. Valores retidos poderão ser utilizados para reembolsar participantes lesados.
           </TermsSection>
 
           <TermsSection title="7. Aceitação e Vigência">
