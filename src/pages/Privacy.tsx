@@ -24,7 +24,7 @@ export default function Privacy() {
         </div>
 
         <div className="p-8 space-y-8 text-slate-300 text-sm leading-relaxed">
-          <p>A GGRIFAS se compromete a proteger sua privacidade em conformidade com a <strong className="text-white">Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.</p>
+          <p>A AZARÃO se compromete a proteger sua privacidade em conformidade com a <strong className="text-white">Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.</p>
 
           <Section title="1. Dados Coletados">
             <ul className="list-disc pl-5 space-y-2">
@@ -66,7 +66,7 @@ export default function Privacy() {
               <li>Solicitar a exclusão dos seus dados (quando não houver obrigação legal de retenção)</li>
               <li>Revogar o consentimento a qualquer momento</li>
             </ul>
-            <p>Para exercer seus direitos, entre em contato: <a href="mailto:ggrifasadm@gmail.com" className="text-indigo-400 hover:underline">ggrifasadm@gmail.com</a></p>
+            <p>Para exercer seus direitos, entre em contato: <a href="mailto:azaraoadm@gmail.com" className="text-indigo-400 hover:underline">azaraoadm@gmail.com</a></p>
           </Section>
 
           <Section title="5. Segurança">
