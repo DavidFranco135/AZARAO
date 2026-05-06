@@ -78,7 +78,7 @@ export default function DrawLive() {
       setLoading(false);
     });
     return () => { unsub(); if (countIntervalRef.current) clearInterval(countIntervalRef.current); };
-
+  }, [id]);
 
   if (loading)
     return (
