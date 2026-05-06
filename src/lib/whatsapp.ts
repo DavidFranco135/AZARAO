@@ -29,7 +29,7 @@ Você foi o grande ganhador da rifa *"${raffleTitle}"*!
 
 Entre em contato para combinar a entrega do prêmio.
 
-_Mensagem enviada pela plataforma GGRIFAS_ 🎉`,
+_Mensagem enviada pela plataforma AZARÃO_ 🎉`,
 
   payment: (name: string, raffleTitle: string, amount: number) =>
 `Olá, *${name}*! 👋
@@ -38,7 +38,7 @@ Identificamos seu pagamento de *R$ ${amount.toFixed(2)}* na rifa *"${raffleTitle
 
 ✅ Seus números estão confirmados!
 
-_GGRIFAS_`,
+_AZARÃO_`,
 
   reminder: (name: string, raffleTitle: string, drawDate: string) =>
 `Olá, *${name}*! 🎟️
@@ -49,12 +49,12 @@ Lembrete: o sorteio da rifa *"${raffleTitle}"* está se aproximando!
 
 Ainda dá tempo de comprar mais cotas. Boa sorte! 🍀
 
-_GGRIFAS_`,
+_AZARÃO_`,
 
   custom: (name: string, message: string) =>
 `Olá, *${name}*! 👋
 
 ${message}
 
-_GGRIFAS_`,
+_AZARÃO_`,
 };
