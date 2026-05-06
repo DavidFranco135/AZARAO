@@ -61,6 +61,13 @@ export const registerUser = async (
   return userData;
 };
 
+/** Agenda contagem regressiva para o sorteio */
+export const scheduleDrawCountdown = async (raffleId: string) => {
+  await updateDoc(doc(db, "raffles", raffleId), {
+    drawScheduledAt: serverTimestamp(),
+  });
+};
+
 /** Marca que o criador aceitou os termos do criador */
 export const markCreatorTermsAccepted = async (uid: string, commissionRate: number) => {
   await updateDoc(doc(db, "users", uid), {
