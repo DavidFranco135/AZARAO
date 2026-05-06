@@ -13,6 +13,7 @@ import CreateRaffle from "./pages/CreateRaffle";
 import AdminPanel from "./pages/AdminPanel";
 import MyOrders from "./pages/MyOrders";
 import RaffleManage from "./pages/RaffleManage";
+import DrawLive from "./pages/DrawLive";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { User } from "./types";
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
               <Route path="/create-raffle" element={user ? <CreateRaffle user={user} /> : <Navigate to="/login" />} />
               <Route path="/dashboard/raffle/:id" element={user ? <RaffleManage user={user} /> : <Navigate to="/login" />} />
+              <Route path="/draw/:id" element={<DrawLive />} />
               <Route path="/termos" element={<Terms />} />
               <Route path="/privacidade" element={<Privacy />} />
               <Route path="/admin" element={user?.role === "admin" ? <AdminPanel user={user} /> : <Navigate to="/" />} />
