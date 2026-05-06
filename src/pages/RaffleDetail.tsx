@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
+import CompleteProfileModal from "../components/CompleteProfileModal";
 import {
   Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
   CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
   Copy, QrCode, RefreshCw, Users, FlaskConical, Trophy,
-  CreditCard, Loader2,
+  CreditCard, Loader2, Radio,
 } from "lucide-react";
 import { Raffle, User, Order } from "../types";
 import {
@@ -25,6 +26,8 @@ export default function RaffleDetail({ user }: Props) {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalStep | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(user);
   const [quickQty, setQuickQty] = useState(1);
   const [copied, setCopied] = useState(false);
   const [mpLoading, setMpLoading] = useState(false);
@@ -84,18 +87,24 @@ export default function RaffleDetail({ user }: Props) {
   };
 
   const handleBuy = async () => {
-    if (!user) { navigate("/login"); return; }
+    if (!currentUser) { navigate("/login"); return; }
     if (!raffle || selectedNumbers.length === 0) return;
+    // Verifica se perfil está completo (CPF + telefone)
+    if (!currentUser.profileComplete) {
+      setShowProfileModal(true);
+      return;
+    }
     setModal("choose");
   };
 
   // ── Simulação (rifas de teste) ────────────────────────────────────────────
 
   const handleSimPayment = async () => {
-    if (!raffle || !user) return;
+    if (!raffle || !currentUser) return;
     const total = selectedNumbers.length * raffle.pricePerNumber;
     const orderId = await createOrder(
-      raffle.id, raffle.title, user.id, user.name, selectedNumbers, total
+      raffle.id, raffle.title, currentUser.id, currentUser.name, selectedNumbers, total,
+      currentUser.phone, currentUser.cpf
     );
     setPendingOrderId(orderId);
     setModal("pix_sim");
@@ -113,13 +122,14 @@ export default function RaffleDetail({ user }: Props) {
   // ── Mercado Pago (rifas reais) ────────────────────────────────────────────
 
   const handleMpPayment = async () => {
-    if (!raffle || !user) return;
+    if (!raffle || !currentUser) return;
     setMpLoading(true);
     const total = selectedNumbers.length * raffle.pricePerNumber;
 
     // Cria pedido pendente primeiro
     const orderId = await createOrder(
-      raffle.id, raffle.title, user.id, user.name, selectedNumbers, total
+      raffle.id, raffle.title, currentUser.id, currentUser.name, selectedNumbers, total,
+      currentUser.phone, currentUser.cpf
     );
     setPendingOrderId(orderId);
     setModal("mp_redirect");
@@ -134,8 +144,8 @@ export default function RaffleDetail({ user }: Props) {
           raffleTitle: raffle.title,
           quantity: selectedNumbers.length,
           unitPrice: raffle.pricePerNumber,
-          payerEmail: user.email,
-          payerName: user.name,
+          payerEmail: currentUser.email,
+          payerName: currentUser.name,
           commissionPercentage: raffle.commissionPercentage,
         }),
       });
@@ -190,6 +200,8 @@ export default function RaffleDetail({ user }: Props) {
   const totalSelected = selectedNumbers.length * raffle.pricePerNumber;
   const img = raffle.images?.[0] ?? `https://picsum.photos/seed/${raffle.id}/800/600`;
   const participantIds = new Set(orders.map((o) => o.userId));
+  const isCreatorOrAdmin = user?.role === "creator" || user?.role === "admin"
+    || user?.id === raffle.creatorId;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 md:py-14">
@@ -209,6 +221,30 @@ export default function RaffleDetail({ user }: Props) {
           <FlaskConical size={16} className="text-amber-400" />
           <span className="text-xs font-black text-amber-400 uppercase tracking-widest">
             Rifa de Simulação — Nenhum pagamento real será cobrado
+          </span>
+        </div>
+      )}
+
+      {/* Botão ao vivo — visível quando sorteio está ativo */}
+      {raffle.status === "active" && (
+        <div className="mb-6 flex items-center gap-3">
+          <a
+            href={`/draw/${raffle.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 hover:text-red-300 px-5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+          >
+            <motion.span
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            >
+              🔴
+            </motion.span>
+            <Radio size={14} />
+            Assistir Sorteio ao Vivo
+          </a>
+          <span className="text-[10px] text-slate-600 font-bold hidden sm:block">
+            Compartilhe este link com os participantes
           </span>
         </div>
       )}
@@ -309,10 +345,13 @@ export default function RaffleDetail({ user }: Props) {
                   className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full"
                 />
               </div>
-              <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-slate-600">
-                <span>{raffle.soldNumbers.length} vendidas</span>
-                <span>Meta: {raffle.totalNumbers}</span>
-              </div>
+              {/* Meta e vendidas: apenas criador/admin */}
+              {isCreatorOrAdmin && (
+                <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-slate-600">
+                  <span>{raffle.soldNumbers.length} vendidas</span>
+                  <span>Meta: {raffle.totalNumbers}</span>
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -501,6 +540,19 @@ export default function RaffleDetail({ user }: Props) {
           </motion.div>
         </div>
       </div>
+
+      {/* ── Complete Profile Modal ────────────────────────────────────── */}
+      {showProfileModal && currentUser && (
+        <CompleteProfileModal
+          user={currentUser}
+          onComplete={(updated) => {
+            setCurrentUser(updated);
+            setShowProfileModal(false);
+            setModal("choose");
+          }}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
 
       {/* ── MODALS ────────────────────────────────────────────────────── */}
       <AnimatePresence>
