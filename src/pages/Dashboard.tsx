@@ -207,17 +207,26 @@ export default function Dashboard({ user }: { user: User | null }) {
                           <Eye size={13} />
                         </Link>
                         {raffle.status === "active" && (
-                          <button
-                            onClick={() => handleDraw(raffle)}
-                            disabled={drawing === raffle.id}
-                            className="p-2 text-slate-500 hover:text-yellow-400 bg-slate-800 rounded-lg border border-slate-700 transition-all disabled:opacity-40"
-                            title="Realizar Sorteio"
-                          >
-                            {drawing === raffle.id
-                              ? <Loader2 size={13} className="animate-spin" />
-                              : <Shuffle size={13} />
-                            }
-                          </button>
+                          <>
+                            <Link
+                              to={`/draw/${raffle.id}`}
+                              target="_blank"
+                              className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800 rounded-lg border border-slate-700 transition-all"
+                              title="Ver página ao vivo"
+                            >
+                              <Radio size={13} />
+                            </Link>
+                            <button
+                              onClick={() => handleDraw(raffle)}
+                              disabled={drawing === raffle.id}
+                              className="p-2 text-slate-500 hover:text-yellow-400 bg-slate-800 rounded-lg border border-slate-700 transition-all disabled:opacity-40"
+                              title="Realizar Sorteio"
+                            >
+                              {drawing === raffle.id
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Shuffle size={13} />
+                              }
+                            </button>
                           </>
                         )}
                         <button
