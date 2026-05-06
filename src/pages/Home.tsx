@@ -370,7 +370,6 @@ function PublicHome({ user }: { user: User | null }) {
                 {filtered.map((raffle, idx) => {
                   const img = raffle.images?.[0] ?? `https://picsum.photos/seed/${raffle.id}/600/300`;
                   const pct = raffle.totalNumbers > 0 ? (raffle.soldNumbers.length/raffle.totalNumbers)*100 : 0;
-                  const available = raffle.totalNumbers - raffle.soldNumbers.length;
                   const daysLeft = Math.ceil((tsToDate(raffle.drawDate).getTime()-now)/(1000*60*60*24));
                   const isHot = pct > 70;
                   const isNew = idx < 2 && filter === "todos";
@@ -428,8 +427,8 @@ function PublicHome({ user }: { user: User | null }) {
                         {/* Barra de progresso */}
                         <div className="space-y-2">
                           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                            <span className="text-emerald-400">✓ {available} disponíveis</span>
-                            <span className="text-slate-500">{raffle.soldNumbers.length} vendidos</span>
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Progresso</span>
+                            <span className="text-white font-black">{pct.toFixed(0)}%</span>
                           </div>
                           <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
                             <motion.div
