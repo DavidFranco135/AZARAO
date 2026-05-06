@@ -122,7 +122,7 @@ export default function Auth({ mode, onAuth }: AuthProps) {
                 <div className="bg-white p-2.5 rounded-xl text-indigo-600 shadow-xl">
                   <Ticket size={26} />
                 </div>
-                <span className="text-2xl font-bold tracking-tight">GGRIFAS</span>
+                <span className="text-2xl font-bold tracking-tight">AZARÃO</span>
               </div>
               <div className="space-y-5">
                 <h2 className="text-4xl font-black leading-none tracking-tight">
