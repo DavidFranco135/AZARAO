@@ -4,8 +4,9 @@ import { motion } from "motion/react";
 import {
   TrendingUp, Users, DollarSign, ChevronRight, PlusCircle,
   Ticket, BarChart3, Calendar, Trash2, Eye, Trophy,
-  FlaskConical, Shuffle, Loader2,
+  FlaskConical, Shuffle, Loader2, Radio,
 } from "lucide-react";
+import { DrawAnimation } from "./DrawLive";
 import { User, DashboardRaffle } from "../types";
 import {
   getCreatorDashboard, deleteRaffle, performDraw, tsToDate,
@@ -16,6 +17,7 @@ export default function Dashboard({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [drawing, setDrawing] = useState<string | null>(null);
+  const [drawLiveData, setDrawLiveData] = useState<{ raffle: DashboardRaffle } | null>(null);
   const [drawResult, setDrawResult] = useState<{
     raffleTitle: string;
     winnerNumber: number;
@@ -49,11 +51,8 @@ export default function Dashboard({ user }: { user: User | null }) {
     setDrawing(raffle.id);
     try {
       const result = await performDraw(raffle.id);
-      setDrawResult({
-        raffleTitle: raffle.title,
-        winnerNumber: result.winnerNumber,
-        winnerName: result.winnerName,
-      });
+      // Show live animation
+      setDrawLiveData({ raffle: { ...raffle, winnerNumber: result.winnerNumber, winnerName: result.winnerName, status: "finished" } });
       await load();
     } catch (err: unknown) {
       alert((err as Error).message ?? "Erro ao realizar o sorteio.");
@@ -219,6 +218,7 @@ export default function Dashboard({ user }: { user: User | null }) {
                               : <Shuffle size={13} />
                             }
                           </button>
+                          </>
                         )}
                         <button
                           onClick={() => handleDelete(raffle.id)}
@@ -327,6 +327,23 @@ export default function Dashboard({ user }: { user: User | null }) {
           })}
         </div>
       </div>
+
+      {/* Live Draw Animation */}
+      {drawLiveData && drawLiveData.raffle.soldNumbers.length > 0 && drawLiveData.raffle.winnerNumber && (
+        <DrawAnimation
+          soldNumbers={drawLiveData.raffle.soldNumbers}
+          winnerNumber={drawLiveData.raffle.winnerNumber}
+          winnerName={drawLiveData.raffle.winnerName ?? "Ganhador"}
+          onComplete={() => {
+            setDrawResult({
+              raffleTitle: drawLiveData.raffle.title,
+              winnerNumber: drawLiveData.raffle.winnerNumber!,
+              winnerName: drawLiveData.raffle.winnerName ?? "Ganhador",
+            });
+            setDrawLiveData(null);
+          }}
+        />
+      )}
 
       {/* Draw Result Modal */}
       {drawResult && (
