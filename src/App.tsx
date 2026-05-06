@@ -46,7 +46,7 @@ export default function App() {
         <div className="flex flex-col items-center space-y-6">
           <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin shadow-2xl shadow-indigo-500/20" />
           <p className="text-slate-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
-            Carregando GGRIFAS...
+            Carregando AZARÃO...
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export default function App() {
             <div className="flex justify-center items-center space-x-2 mb-5">
               <div className="bg-indigo-600 p-2 rounded-xl text-white italic font-black text-sm">GG</div>
               <span className="text-2xl font-black text-white italic tracking-tighter">
-                GG<span className="text-indigo-500">RIFAS</span>
+                AZA<span className="text-indigo-500">RÃO</span>
               </span>
             </div>
             <p className="text-slate-500 font-medium text-sm max-w-lg mx-auto mb-7 leading-relaxed">
@@ -90,10 +90,10 @@ export default function App() {
             <div className="flex justify-center flex-wrap gap-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-7">
               <Link to="/termos" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link>
               <Link to="/privacidade" className="hover:text-indigo-400 transition-colors">Privacidade</Link>
-              <a href="mailto:ggrifasadm@gmail.com" className="hover:text-indigo-400 transition-colors">Suporte</a>
+              <a href="mailto:azaraoadm@gmail.com" className="hover:text-indigo-400 transition-colors">Suporte</a>
             </div>
             <div className="pt-7 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} GGRIFAS SaaS. Todos os direitos reservados.
+              © {new Date().getFullYear()} AZARÃO SaaS. Todos os direitos reservados.
             </div>
           </div>
         </footer>
