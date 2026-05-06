@@ -53,15 +53,17 @@ export default function Dashboard({ user }: { user: User | null }) {
     // Salva no Firestore para sincronizar com página ao vivo
     await scheduleDrawCountdown(raffle.id);
 
-    // Inicia contagem regressiva local
-    let secs = 60;
-    setCountdown({ raffleId: raffle.id, raffleTitle: raffle.title, seconds: secs });
+    // Usa timestamp real para sincronizar com viewers
+    const startMs = Date.now();
+    const getRemaining = () => Math.max(0, 60 - Math.floor((Date.now() - startMs) / 1000));
+
+    setCountdown({ raffleId: raffle.id, raffleTitle: raffle.title, seconds: getRemaining() });
 
     countdownRef.current = setInterval(async () => {
-      secs -= 1;
-      setCountdown((prev) => prev ? { ...prev, seconds: secs } : null);
+      const rem = getRemaining();
+      setCountdown((prev) => prev ? { ...prev, seconds: rem } : null);
 
-      if (secs <= 0) {
+      if (rem <= 0) {
         if (countdownRef.current) clearInterval(countdownRef.current);
         setCountdown(null);
         setDrawing(raffle.id);
@@ -75,7 +77,7 @@ export default function Dashboard({ user }: { user: User | null }) {
           setDrawing(null);
         }
       }
-    }, 1000);
+    }, 500); // 500ms para precisão
   };
 
   const totalGeral = raffles.reduce((a, r) => a + r.totalArrecadado, 0);
@@ -357,26 +359,38 @@ export default function Dashboard({ user }: { user: User | null }) {
       {/* Countdown Modal */}
       {countdown && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
-          <div className="bg-slate-900 w-full max-w-md rounded-[2.5rem] border border-slate-800 shadow-2xl p-10 text-center space-y-6">
-            <div className="text-5xl">⏳</div>
+          <div className="bg-slate-900 w-full max-w-sm sm:max-w-md rounded-[2rem] border border-slate-800 shadow-2xl p-6 sm:p-10 text-center space-y-5">
+            <div className="text-4xl">⏳</div>
             <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Sorteio começando em</p>
-              <p className="text-8xl font-black text-white leading-none" style={{ fontVariantNumeric: "tabular-nums" }}>
-                {String(countdown.seconds).padStart(2,"0")}
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
+                Sorteio começando em
               </p>
-              <p className="text-slate-500 font-medium mt-2 text-sm">segundos</p>
+              {/* Contador com barra de progresso */}
+              <div className="relative w-36 h-36 sm:w-44 sm:h-44 mx-auto flex items-center justify-center">
+                <svg viewBox="0 0 180 180" className="absolute inset-0 w-full h-full -rotate-90">
+                  <circle cx="90" cy="90" r="78" fill="none" stroke="#1e1e2e" strokeWidth="10"/>
+                  <circle
+                    cx="90" cy="90" r="78"
+                    fill="none" stroke="#6366f1" strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 78}`}
+                    strokeDashoffset={`${2 * Math.PI * 78 * (1 - countdown.seconds / 60)}`}
+                    style={{ transition: "stroke-dashoffset 0.8s ease" }}
+                  />
+                </svg>
+                <div className="relative z-10 text-center">
+                  <p className="text-5xl sm:text-6xl font-black text-white leading-none tabular-nums">
+                    {String(countdown.seconds).padStart(2,"0")}
+                  </p>
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">seg</p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 px-2">
               <p className="text-sm font-bold text-white line-clamp-1">{countdown.raffleTitle}</p>
-              <p className="text-xs text-indigo-300 font-medium">
+              <p className="text-xs text-indigo-300 font-medium leading-relaxed">
                 📡 Compartilhe o link ao vivo com seus participantes agora!
               </p>
-            </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
-                style={{ width: `${(countdown.seconds / 60) * 100}%` }}
-              />
             </div>
             <button
               onClick={() => {
