@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import {
@@ -9,7 +9,7 @@ import {
 import { DrawAnimation } from "./DrawLive";
 import { User, DashboardRaffle } from "../types";
 import {
-  getCreatorDashboard, deleteRaffle, performDraw, tsToDate,
+  getCreatorDashboard, deleteRaffle, performDraw, scheduleDrawCountdown, tsToDate,
 } from "../lib/firebaseService";
 
 export default function Dashboard({ user }: { user: User | null }) {
@@ -18,6 +18,8 @@ export default function Dashboard({ user }: { user: User | null }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [drawing, setDrawing] = useState<string | null>(null);
   const [drawLiveData, setDrawLiveData] = useState<{ raffle: DashboardRaffle } | null>(null);
+  const [countdown, setCountdown] = useState<{ raffleId: string; raffleTitle: string; seconds: number } | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [drawResult, setDrawResult] = useState<{
     raffleTitle: string;
     winnerNumber: number;
@@ -46,19 +48,34 @@ export default function Dashboard({ user }: { user: User | null }) {
       alert("Nenhum número vendido ainda. Não é possível realizar o sorteio.");
       return;
     }
-    if (!confirm(`Realizar o sorteio de "${raffle.title}"? Esta ação é irreversível e encerrará a rifa.`)) return;
+    if (!confirm(`Iniciar contagem regressiva de 1 minuto para o sorteio de "${raffle.title}"?\n\nCompartilhe o link ao vivo antes de confirmar!`)) return;
 
-    setDrawing(raffle.id);
-    try {
-      const result = await performDraw(raffle.id);
-      // Show live animation
-      setDrawLiveData({ raffle: { ...raffle, winnerNumber: result.winnerNumber, winnerName: result.winnerName, status: "finished" } });
-      await load();
-    } catch (err: unknown) {
-      alert((err as Error).message ?? "Erro ao realizar o sorteio.");
-    } finally {
-      setDrawing(null);
-    }
+    // Salva no Firestore para sincronizar com página ao vivo
+    await scheduleDrawCountdown(raffle.id);
+
+    // Inicia contagem regressiva local
+    let secs = 60;
+    setCountdown({ raffleId: raffle.id, raffleTitle: raffle.title, seconds: secs });
+
+    countdownRef.current = setInterval(async () => {
+      secs -= 1;
+      setCountdown((prev) => prev ? { ...prev, seconds: secs } : null);
+
+      if (secs <= 0) {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        setCountdown(null);
+        setDrawing(raffle.id);
+        try {
+          const result = await performDraw(raffle.id);
+          setDrawLiveData({ raffle: { ...raffle, winnerNumber: result.winnerNumber, winnerName: result.winnerName, status: "finished" } });
+          await load();
+        } catch (err: unknown) {
+          alert((err as Error).message ?? "Erro ao realizar o sorteio.");
+        } finally {
+          setDrawing(null);
+        }
+      }
+    }, 1000);
   };
 
   const totalGeral = raffles.reduce((a, r) => a + r.totalArrecadado, 0);
@@ -336,6 +353,43 @@ export default function Dashboard({ user }: { user: User | null }) {
           })}
         </div>
       </div>
+
+      {/* Countdown Modal */}
+      {countdown && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
+          <div className="bg-slate-900 w-full max-w-md rounded-[2.5rem] border border-slate-800 shadow-2xl p-10 text-center space-y-6">
+            <div className="text-5xl">⏳</div>
+            <div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Sorteio começando em</p>
+              <p className="text-8xl font-black text-white leading-none" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {String(countdown.seconds).padStart(2,"0")}
+              </p>
+              <p className="text-slate-500 font-medium mt-2 text-sm">segundos</p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-white line-clamp-1">{countdown.raffleTitle}</p>
+              <p className="text-xs text-indigo-300 font-medium">
+                📡 Compartilhe o link ao vivo com seus participantes agora!
+              </p>
+            </div>
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
+                style={{ width: `${(countdown.seconds / 60) * 100}%` }}
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (countdownRef.current) clearInterval(countdownRef.current);
+                setCountdown(null);
+              }}
+              className="text-xs text-slate-500 hover:text-red-400 font-bold uppercase tracking-widest transition-colors"
+            >
+              Cancelar sorteio
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Live Draw Animation */}
       {drawLiveData && drawLiveData.raffle.soldNumbers.length > 0 && drawLiveData.raffle.winnerNumber && (
