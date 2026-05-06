@@ -28,6 +28,7 @@ export interface Raffle {
   winnerId?: string;
   winnerName?: string;
   drawnAt?: unknown;
+  drawScheduledAt?: unknown; // timestamp quando criador agendou o sorteio
 }
 
 export interface Order {
