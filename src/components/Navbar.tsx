@@ -22,7 +22,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               <Ticket size={20} className="text-white" />
             </div>
             <span className="text-lg sm:text-xl font-black tracking-tighter text-white italic">
-              GG<span className="text-indigo-500">RIFAS</span>
+              AZA<span className="text-indigo-500">RÃO</span>
             </span>
           </Link>
 
