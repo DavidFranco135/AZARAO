@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import WhatsAppModal from "../components/WhatsAppModal";
 import { User, Raffle, Order } from "../types";
-import UserDetailsModal from "../components/UserDetailsModal";
+import AdminUserEditModal from "../components/AdminUserEditModal";
 import {
   getAllUsers, getAllRaffles, getAllOrders,
   updateUserRole, deleteRaffle,
@@ -20,6 +20,7 @@ type Tab = "overview" | "users" | "raffles" | "orders" | "settings";
 export default function AdminPanel({ user }: AdminPanelProps) {
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedUser, setSelectedUser] = useState<(User & { createdAt?: unknown }) | null>(null);
+  const [userSearch,   setUserSearch]   = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -190,59 +191,71 @@ export default function AdminPanel({ user }: AdminPanelProps) {
       {/* ── USERS ── */}
       <div style={{ display: tab === "users" ? "block" : "none" }}>
         <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-          <div className="p-5 border-b border-slate-800">
+          {/* Header + busca */}
+          <div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <h3 className="font-black text-white">Usuários ({users.length})</h3>
+            <input
+              type="text"
+              placeholder="Buscar por nome ou e-mail..."
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-indigo-500 w-full sm:w-64 transition-colors"
+            />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-950/30">
-                <tr>
-                  {["Nome", "E-mail", "Papel", ""].map((h) => (
-                    <th key={h} className="px-5 py-4 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/20 transition-all">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-xs font-black">
-                          {u.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <button onClick={() => setSelectedUser(u as any)} className="text-sm font-medium text-white hover:text-indigo-400 transition-colors">{u.name}</button>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-sm text-slate-400">{u.email}</td>
-                    <td className="px-5 py-4">
-                      {editingRole === u.id ? (
-                        <select value={roleValue} onChange={(e) => setRoleValue(e.target.value as User["role"])} className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white outline-none">
-                          {["user", "creator", "admin"].map((r) => <option key={r} value={r} className="bg-slate-900">{r}</option>)}
-                        </select>
-                      ) : (
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
-                          u.role === "admin" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                          : u.role === "creator" ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
-                          : "bg-slate-800 text-slate-500 border-slate-700"
-                        }`}>{u.role}</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      {editingRole === u.id ? (
-                        <div className="flex gap-2">
-                          <button onClick={() => handleSaveRole(u.id)} className="p-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg"><Check size={13} /></button>
-                          <button onClick={() => setEditingRole(null)} className="p-1.5 bg-slate-800 text-slate-400 rounded-lg"><X size={13} /></button>
-                        </div>
-                      ) : (
-                        <button onClick={() => { setEditingRole(u.id); setRoleValue(u.role); }} className="p-1.5 text-slate-500 hover:text-white bg-slate-800 rounded-lg border border-slate-700">
-                          <Edit2 size={13} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          {/* Cards de usuários (mobile-friendly) */}
+          <div className="divide-y divide-slate-800/50">
+            {users
+              .filter(u =>
+                !userSearch ||
+                u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+                u.email?.toLowerCase().includes(userSearch.toLowerCase())
+              )
+              .map((u) => (
+              <div key={u.id}
+                className="flex items-center gap-4 px-5 py-4 hover:bg-slate-800/20 transition-all group"
+              >
+                {/* Avatar */}
+                <div className="w-10 h-10 rounded-xl bg-indigo-600/10 flex items-center justify-center text-indigo-400 text-sm font-black border border-indigo-500/10 shrink-0">
+                  {u.name?.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-sm truncate">{u.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${
+                      u.role === "admin"   ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      : u.role === "creator" ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                      : "bg-slate-800 text-slate-500 border-slate-700"
+                    }`}>{u.role === "user" ? "Participante" : u.role === "creator" ? "Criador" : "Admin"}</span>
+                    {u.profileComplete
+                      ? <span className="text-[9px] text-emerald-500 font-bold">✓ Completo</span>
+                      : <span className="text-[9px] text-amber-500 font-bold">⚠ Incompleto</span>
+                    }
+                    {u.phone && <span className="text-[9px] text-slate-600 font-medium hidden sm:block">{u.phone.replace(/\D/g,"").replace(/(\d{2})(\d{5})(\d{4})/,"($1) $2-$3")}</span>}
+                  </div>
+                </div>
+
+                {/* Ação */}
+                <button
+                  onClick={() => setSelectedUser(u as any)}
+                  className="shrink-0 flex items-center gap-1.5 bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white px-3 py-2 rounded-xl text-xs font-bold transition-all border border-slate-700 hover:border-indigo-500"
+                >
+                  <Edit2 size={13}/> Editar
+                </button>
+              </div>
+            ))}
+            {users.filter(u =>
+              !userSearch ||
+              u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+              u.email?.toLowerCase().includes(userSearch.toLowerCase())
+            ).length === 0 && (
+              <div className="py-12 text-center text-slate-500 text-sm">
+                Nenhum usuário encontrado.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -399,9 +412,17 @@ export default function AdminPanel({ user }: AdminPanelProps) {
       </div>
     </div>
       {selectedUser && (
-        <UserDetailsModal
+        <AdminUserEditModal
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
+          onSaved={(updated) => {
+            setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+            setSelectedUser(null);
+          }}
+          onDeleted={(id) => {
+            setUsers(prev => prev.filter(u => u.id !== id));
+            setSelectedUser(null);
+          }}
         />
       )}
     </>
