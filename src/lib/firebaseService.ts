@@ -70,6 +70,36 @@ export const registerUser = async (
   return userData;
 };
 
+
+/** Confirma pedido como pago.
+ * Os números já foram reservados na criação do pedido (transação atômica).
+ * Esta função apenas muda o status para "paid".
+ */
+export const confirmOrderAndReserve = async (
+  orderId: string,
+  _raffleId: string,   // mantido para compatibilidade
+  _numbers: number[], // mantido para compatibilidade
+  mpPaymentId?: string,
+): Promise<void> => {
+  await updateDoc(doc(db, "orders", orderId), {
+    status: "paid",
+    ...(mpPaymentId ? { mpPaymentId } : {}),
+  });
+};
+
+/** Cancela pedido e libera os números reservados */
+export const cancelOrderAndRelease = async (
+  orderId: string,
+  raffleId: string,
+  numbers: number[],
+): Promise<void> => {
+  const { arrayRemove } = await import("firebase/firestore");
+  await updateDoc(doc(db, "orders", orderId), { status: "cancelled" });
+  await updateDoc(doc(db, "raffles", raffleId), {
+    soldNumbers: arrayRemove(...numbers),
+  });
+};
+
 /** Agenda contagem regressiva para o sorteio */
 export const scheduleDrawCountdown = async (raffleId: string) => {
   await updateDoc(doc(db, "raffles", raffleId), {
@@ -220,19 +250,44 @@ export const createOrder = async (
   userPhone?: string,
   userCpf?: string,
 ): Promise<string> => {
-  const ref = await addDoc(collection(db, "orders"), {
-    raffleId,
-    raffleTitle,
-    userId,
-    userName,
-    numbers,
-    totalAmount,
-    status: "pending",
-    ...(userPhone ? { userPhone } : {}),
-    ...(userCpf ? { userCpf } : {}),
-    createdAt: serverTimestamp(),
+  const raffleRef = doc(db, "raffles", raffleId);
+  const orderRef  = doc(collection(db, "orders")); // gera ID antecipado
+
+  await runTransaction(db, async (tx) => {
+    const raffleSnap = await tx.get(raffleRef);
+    if (!raffleSnap.exists()) throw new Error("Rifa não encontrada.");
+
+    const raffle = raffleSnap.data() as Raffle;
+
+    if (raffle.status !== "active") throw new Error("Esta rifa não está mais ativa.");
+
+    // Verifica se algum dos números já foi vendido
+    const soldSet = new Set(raffle.soldNumbers ?? []);
+    const conflict = numbers.find((n) => soldSet.has(n));
+    if (conflict) {
+      throw new Error(`O número #${String(conflict).padStart(3,"0")} acabou de ser comprado por outra pessoa. Por favor, escolha outros números.`);
+    }
+
+    // Reserva os números atomicamente e cria o pedido
+    tx.update(raffleRef, {
+      soldNumbers: arrayUnion(...numbers),
+    });
+
+    tx.set(orderRef, {
+      raffleId,
+      raffleTitle,
+      userId,
+      userName,
+      numbers,
+      totalAmount,
+      status: "pending",
+      ...(userPhone ? { userPhone } : {}),
+      ...(userCpf ? { userCpf } : {}),
+      createdAt: serverTimestamp(),
+    });
   });
-  return ref.id;
+
+  return orderRef.id;
 };
 
 export const confirmOrderPayment = async (
