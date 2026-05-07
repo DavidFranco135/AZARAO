@@ -329,7 +329,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
               {/* ── Resumo financeiro ── atualiza instantaneamente ── */}
               <div className="p-6 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Taxa Plataforma GGRIFAS</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Taxa Plataforma AZARÃO</span>
                   <span className="text-sm font-bold text-amber-400">{taxaPlat}%</span>
                 </div>
                 <div className="flex justify-between items-center">
