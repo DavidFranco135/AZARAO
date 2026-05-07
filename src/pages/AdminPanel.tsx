@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import WhatsAppModal from "../components/WhatsAppModal";
 import { User, Raffle, Order } from "../types";
+import UserDetailsModal from "../components/UserDetailsModal";
 import {
   getAllUsers, getAllRaffles, getAllOrders,
   updateUserRole, deleteRaffle,
@@ -18,6 +19,7 @@ type Tab = "overview" | "users" | "raffles" | "orders" | "settings";
 
 export default function AdminPanel({ user }: AdminPanelProps) {
   const [tab, setTab] = useState<Tab>("overview");
+  const [selectedUser, setSelectedUser] = useState<(User & { createdAt?: unknown }) | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -92,6 +94,7 @@ export default function AdminPanel({ user }: AdminPanelProps) {
     );
 
   return (
+    <>
     <div className="max-w-7xl mx-auto px-4 py-10 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -153,7 +156,10 @@ export default function AdminPanel({ user }: AdminPanelProps) {
                     <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-800 shrink-0">
                       <img src={r.images?.[0] ?? `https://picsum.photos/seed/${r.id}/100`} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                     </div>
-                    <p className="text-sm font-medium text-slate-300 truncate">{r.title}</p>
+                    <div>
+                      <p className="text-sm font-medium text-slate-300 truncate">{r.title}</p>
+                      {(r as any).raffleCode && <p className="text-[10px] font-black text-indigo-400">#{(r as any).raffleCode}</p>}
+                    </div>
                   </div>
                   <span className={`text-[10px] font-black uppercase ml-2 shrink-0 ${r.status === "active" ? "text-emerald-400" : "text-slate-500"}`}>
                     {r.status === "active" ? "Ativa" : "Encerrada"}
@@ -204,7 +210,7 @@ export default function AdminPanel({ user }: AdminPanelProps) {
                         <div className="w-8 h-8 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-xs font-black">
                           {u.name?.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-sm font-medium text-white">{u.name}</span>
+                        <button onClick={() => setSelectedUser(u as any)} className="text-sm font-medium text-white hover:text-indigo-400 transition-colors">{u.name}</button>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-400">{u.email}</td>
@@ -264,7 +270,13 @@ export default function AdminPanel({ user }: AdminPanelProps) {
                         <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 shrink-0">
                           <img src={r.images?.[0] ?? `https://picsum.photos/seed/${r.id}/100`} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                         </div>
-                        <p className="text-sm font-medium text-white line-clamp-1 max-w-[180px]">{r.title}</p>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-white line-clamp-1">{r.title}</p>
+                            {(r as any).deleted && <span className="text-[9px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 uppercase shrink-0">Excluída</span>}
+                          </div>
+                          {(r as any).raffleCode && <span className="text-[10px] font-black text-indigo-400">#{(r as any).raffleCode}</span>}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-sm text-slate-400">{r.creatorName ?? "—"}</td>
@@ -386,6 +398,13 @@ export default function AdminPanel({ user }: AdminPanelProps) {
         </div>
       </div>
     </div>
+      {selectedUser && (
+        <UserDetailsModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
+    </>
   );
 }
 
