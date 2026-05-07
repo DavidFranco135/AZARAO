@@ -105,13 +105,20 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
             });
             const data = await res.json();
             if (data.status === "approved") {
+              // Garante reserva das cotas
+              const { confirmOrderAndReserve } = await import("../lib/firebaseService");
+              await confirmOrderAndReserve(oid, raffleId, selectedNumbers, String(data.paymentId));
               setStep("success");
               setTimeout(onSuccess, 2000);
             } else if (data.status === "in_process") {
               alert("Pagamento em análise. Aguarde a confirmação.");
               onClose();
             } else {
-              alert(`Pagamento recusado: ${data.statusDetail ?? "tente outro cartão."}`);
+              // Pagamento recusado — libera os números reservados
+              const { cancelOrderAndRelease } = await import("../lib/firebaseService");
+              await cancelOrderAndRelease(oid, raffleId, selectedNumbers).catch(() => {});
+              alert(`Pagamento recusado: ${data.statusDetail ?? "tente outro cartão."}\nSeus números foram liberados.`);
+              onClose();
             }
           } catch {
             alert("Erro ao processar pagamento. Tente novamente.");
@@ -165,6 +172,9 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
           const s = await fetch(`/api/mp-payment-status?id=${data.paymentId}`).then(r => r.json());
           if (s.status === "approved") {
             clearInterval(poll);
+            // Garante que as cotas sejam reservadas mesmo se o webhook demorar
+            const { confirmOrderAndReserve } = await import("../lib/firebaseService");
+            await confirmOrderAndReserve(oid, raffleId, selectedNumbers, String(data.paymentId));
             setStep("success");
             setTimeout(onSuccess, 2000);
           }
@@ -172,6 +182,11 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
       }, 4000);
       setTimeout(() => clearInterval(poll), 30 * 60 * 1000);
     } catch (err) {
+      // Se já criou o pedido, cancela e libera os números
+      if (orderId) {
+        const { cancelOrderAndRelease } = await import("../lib/firebaseService");
+        await cancelOrderAndRelease(orderId, raffleId, selectedNumbers).catch(() => {});
+      }
       const msg = String(err).replace("Error: ","");
       alert(`Erro PIX: ${msg.slice(0,200)}`);
       console.error("PIX error:", err);
