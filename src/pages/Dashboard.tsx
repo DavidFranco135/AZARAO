@@ -33,6 +33,12 @@ export default function Dashboard({ user }: { user: User | null }) {
     setLoading(false);
   };
 
+  // Recarrega sem interferir no countdown ativo
+  const safeLoad = async () => {
+    if (countdown !== null) return; // não recarrega durante contagem
+    await load();
+  };
+
   useEffect(() => { load(); }, [user]);
 
   const handleDelete = async (id: string) => {
@@ -69,10 +75,18 @@ export default function Dashboard({ user }: { user: User | null }) {
         setDrawing(raffle.id);
         try {
           const result = await performDraw(raffle.id);
-          setDrawLiveData({ raffle: { ...raffle, winnerNumber: result.winnerNumber, winnerName: result.winnerName, status: "finished" } });
-          await load();
+          // Mostra animação — load() só é chamado quando animação terminar (onComplete)
+          setDrawLiveData({
+            raffle: {
+              ...raffle,
+              winnerNumber: result.winnerNumber,
+              winnerName: result.winnerName,
+              status: "finished"
+            }
+          });
         } catch (err: unknown) {
           alert((err as Error).message ?? "Erro ao realizar o sorteio.");
+          await load();
         } finally {
           setDrawing(null);
         }
@@ -411,13 +425,14 @@ export default function Dashboard({ user }: { user: User | null }) {
           soldNumbers={drawLiveData.raffle.soldNumbers}
           winnerNumber={drawLiveData.raffle.winnerNumber}
           winnerName={drawLiveData.raffle.winnerName ?? "Ganhador"}
-          onComplete={() => {
+          onComplete={async () => {
             setDrawResult({
               raffleTitle: drawLiveData.raffle.title,
               winnerNumber: drawLiveData.raffle.winnerNumber!,
               winnerName: drawLiveData.raffle.winnerName ?? "Ganhador",
             });
             setDrawLiveData(null);
+            await load(); // atualiza lista APÓS animação terminar
           }}
         />
       )}
