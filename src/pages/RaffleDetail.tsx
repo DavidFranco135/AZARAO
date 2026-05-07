@@ -28,6 +28,9 @@ export default function RaffleDetail({ user }: Props) {
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(user);
+  const [pixData, setPixData] = useState<{ qrCode: string; qrBase64: string; paymentId: number } | null>(null);
+  const [pixStatus, setPixStatus] = useState<"pending"|"approved"|"error">("pending");
+  const [payMethod, setPayMethod] = useState<"pix"|"card">("pix");
   const [quickQty, setQuickQty] = useState(1);
   const [copied, setCopied] = useState(false);
   const [mpLoading, setMpLoading] = useState(false);
@@ -117,6 +120,55 @@ export default function RaffleDetail({ user }: Props) {
     await load();
     setSelectedNumbers([]);
     setModal("success");
+  };
+
+  // ── PIX direto (sem redirecionar) ────────────────────────────────────────
+  const handlePixPayment = async () => {
+    if (!raffle || !currentUser) return;
+    setMpLoading(true);
+    const total = selectedNumbers.length * raffle.pricePerNumber;
+    const orderId = await createOrder(
+      raffle.id, raffle.title, currentUser.id, currentUser.name,
+      selectedNumbers, total, currentUser.phone, currentUser.cpf
+    );
+    setPendingOrderId(orderId);
+    try {
+      const res = await fetch("/api/mp-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          amount:     total,
+          payerEmail: currentUser.email,
+          payerName:  currentUser.name,
+          payerCpf:   currentUser.cpf ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!data.qrCode) throw new Error(data.error ?? "Erro ao gerar PIX");
+      setPixData({ qrCode: data.qrCode, qrBase64: data.qrBase64, paymentId: data.paymentId });
+      setPixStatus("pending");
+      setModal("pix_real");
+
+      // Polling a cada 4s para verificar pagamento
+      const poll = setInterval(async () => {
+        try {
+          const s = await fetch(`/api/mp-payment-status?id=${data.paymentId}`).then(r => r.json());
+          if (s.status === "approved") {
+            clearInterval(poll);
+            setPixStatus("approved");
+            setModal("success");
+          }
+        } catch { /* ignora */ }
+      }, 4000);
+      setTimeout(() => clearInterval(poll), 30 * 60 * 1000); // para após 30min
+    } catch (err) {
+      cancelPendingOrder(orderId).catch(() => {});
+      alert("Erro ao gerar PIX. Tente novamente.");
+      setModal("choose");
+    } finally {
+      setMpLoading(false);
+    }
   };
 
   // ── Mercado Pago (rifas reais) ────────────────────────────────────────────
@@ -598,56 +650,146 @@ export default function RaffleDetail({ user }: Props) {
                       </button>
                     </div>
                   ) : (
-                    /* ── PAGAMENTO REAL — MERCADO PAGO ── */
+                    /* ── PAGAMENTO REAL ── */
                     <div className="space-y-4">
-                      {/* Card resumo */}
+                      {/* Resumo do valor */}
                       <div className="bg-slate-950 rounded-2xl border border-slate-800 divide-y divide-slate-800">
                         <div className="flex justify-between items-center px-5 py-3">
-                          <span className="text-xs font-bold text-slate-500">Cotas selecionadas</span>
-                          <span className="text-sm font-black text-white">{selectedNumbers.length}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-5 py-3">
-                          <span className="text-xs font-bold text-slate-500">Valor por cota</span>
-                          <span className="text-sm font-black text-white">R$ {raffle.pricePerNumber.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center px-5 py-3">
-                          <span className="text-xs font-bold text-slate-500">Total</span>
+                          <span className="text-xs font-bold text-slate-500">{selectedNumbers.length} cota(s) × R$ {raffle.pricePerNumber.toFixed(2)}</span>
                           <span className="text-lg font-black text-emerald-400">R$ {totalSelected.toLocaleString("pt-BR",{minimumFractionDigits:2})}</span>
                         </div>
                       </div>
 
-                      {/* Botão MP */}
-                      <button
-                        onClick={handleMpPayment}
-                        disabled={mpLoading}
-                        className="w-full bg-[#009ee3] hover:bg-[#0088c7] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-[#009ee3]/20"
-                      >
-                        {mpLoading
-                          ? <><Loader2 size={22} className="animate-spin" /> Preparando pagamento...</>
-                          : <><CreditCard size={22} /> PAGAR COM MERCADO PAGO</>
-                        }
-                      </button>
+                      {/* Seleção do método */}
+                      <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800 gap-1">
+                        <button
+                          onClick={() => setPayMethod("pix")}
+                          className={`flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${payMethod === "pix" ? "bg-[#32BCAD] text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+                        >
+                          <span className="text-base">⚡</span> PIX
+                        </button>
+                        <button
+                          onClick={() => setPayMethod("card")}
+                          className={`flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${payMethod === "card" ? "bg-indigo-600 text-white shadow-lg" : "text-slate-400 hover:text-white"}`}
+                        >
+                          <CreditCard size={16} /> Cartão
+                        </button>
+                      </div>
 
-                      {/* Métodos aceitos */}
-                      <div className="flex items-center justify-center gap-4 py-1">
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                          <div className="w-6 h-4 bg-slate-700 rounded text-[8px] flex items-center justify-center font-black text-white">PIX</div>
-                          <span className="text-[10px] font-bold">PIX</span>
+                      {/* PIX — QR Code direto */}
+                      {payMethod === "pix" && (
+                        <div className="space-y-3">
+                          <div className="bg-slate-950 rounded-2xl border border-[#32BCAD]/20 p-4 space-y-2">
+                            <div className="flex items-center gap-2 text-[#32BCAD]">
+                              <span className="text-lg">⚡</span>
+                              <p className="text-sm font-black">Aprovação instantânea</p>
+                            </div>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              Um QR Code será gerado na próxima tela. Abra o app do seu banco e escaneie — sem precisar de conta no Mercado Pago.
+                            </p>
+                          </div>
+                          <button
+                            onClick={handlePixPayment}
+                            disabled={mpLoading}
+                            className="w-full bg-[#32BCAD] hover:bg-[#28a99b] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-[#32BCAD]/20"
+                          >
+                            {mpLoading ? <><Loader2 size={22} className="animate-spin"/> Gerando PIX...</> : <>⚡ GERAR QR CODE PIX</>}
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                          <CreditCard size={14} />
-                          <span className="text-[10px] font-bold">Cartão</span>
+                      )}
+
+                      {/* Cartão — redireciona para checkout MP */}
+                      {payMethod === "card" && (
+                        <div className="space-y-3">
+                          <div className="bg-slate-950 rounded-2xl border border-indigo-500/20 p-4 space-y-2">
+                            <div className="flex items-center gap-2 text-indigo-400">
+                              <CreditCard size={16}/>
+                              <p className="text-sm font-black">Débito ou Crédito</p>
+                            </div>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              Você será direcionado para o checkout seguro do Mercado Pago. Não é necessário ter conta — pode pagar como visitante.
+                            </p>
+                          </div>
+                          <button
+                            onClick={handleMpPayment}
+                            disabled={mpLoading}
+                            className="w-full bg-[#009ee3] hover:bg-[#0088c7] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-[#009ee3]/20"
+                          >
+                            {mpLoading ? <><Loader2 size={22} className="animate-spin"/> Redirecionando...</> : <><CreditCard size={22}/> PAGAR COM CARTÃO</>}
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-slate-500">
-                          <div className="w-5 h-4 bg-slate-700 rounded text-[7px] flex items-center justify-center font-black text-white">BOL</div>
-                          <span className="text-[10px] font-bold">Boleto</span>
+                      )}
+
+                      <p className="text-center text-[10px] text-slate-600 font-bold">
+                        🔒 Pagamento seguro · Seus dados são protegidos
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── PIX REAL — QR Code ── */}
+              {modal === "pix_real" && pixData && (
+                <div className="p-8 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-black text-white flex items-center gap-2">
+                      <span className="text-[#32BCAD]">⚡</span> Pagar com PIX
+                    </h2>
+                    <button onClick={() => setModal(null)} className="text-slate-500 hover:text-white"><X size={22}/></button>
+                  </div>
+
+                  {pixStatus === "approved" ? (
+                    <div className="text-center py-8 space-y-4">
+                      <div className="text-6xl">✅</div>
+                      <p className="text-xl font-black text-emerald-400">Pagamento confirmado!</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* QR Code */}
+                      <div className="flex flex-col items-center gap-4">
+                        {pixData.qrBase64 ? (
+                          <img
+                            src={`data:image/png;base64,${pixData.qrBase64}`}
+                            alt="QR Code PIX"
+                            className="w-52 h-52 rounded-2xl border-4 border-[#32BCAD]/30"
+                          />
+                        ) : (
+                          <div className="w-52 h-52 bg-white rounded-2xl flex items-center justify-center">
+                            <p className="text-xs text-slate-800 text-center px-4">QR Code indisponível</p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-[#32BCAD] text-sm font-black">
+                          <div className="w-2 h-2 rounded-full bg-[#32BCAD] animate-pulse"/>
+                          Aguardando pagamento...
                         </div>
                       </div>
 
-                      <p className="text-center text-[10px] text-slate-600 font-bold">
-                        🔒 Pagamento 100% seguro processado pelo Mercado Pago
-                      </p>
-                    </div>
+                      {/* Código copia e cola */}
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ou copie o código PIX:</p>
+                        <div className="flex gap-2">
+                          <input
+                            readOnly
+                            value={pixData.qrCode}
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-300 font-mono"
+                          />
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(pixData.qrCode); }}
+                            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-black transition-all border border-slate-700"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 space-y-1.5 text-xs text-slate-400">
+                        <p>1. Abra o app do seu banco</p>
+                        <p>2. Vá em <strong className="text-white">Pix → Pagar com QR Code</strong></p>
+                        <p>3. Escaneie o código acima</p>
+                        <p>4. Confirme o pagamento de <strong className="text-emerald-400">R$ {totalSelected.toLocaleString("pt-BR",{minimumFractionDigits:2})}</strong></p>
+                        <p className="text-slate-500">✓ Confirmação automática em segundos</p>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
