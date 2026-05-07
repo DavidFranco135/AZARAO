@@ -353,19 +353,26 @@ export default function Dashboard({ user }: { user: User | null }) {
                 <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${progress}%` }} />
                 </div>
-                <div className="flex gap-2">
-                  <Link to={`/raffle/${raffle.id}`} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold border border-slate-700">
-                    <Eye size={13} /> Ver
+                <div className="flex gap-2 flex-wrap">
+                  <Link to={`/dashboard/raffle/${raffle.id}`} className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold border border-slate-700 min-w-[60px]">
+                    <Eye size={13} /> Gerenciar
+                  </Link>
+                  <Link to={`/edit-raffle/${raffle.id}`} className="flex-1 flex items-center justify-center gap-1.5 bg-amber-500/10 text-amber-400 py-2.5 rounded-xl text-xs font-bold border border-amber-500/20 min-w-[60px]">
+                    <Edit2 size={13} /> Editar
                   </Link>
                   {raffle.status === "active" && (
-                    <button
-                      onClick={() => handleDraw(raffle)}
-                      disabled={drawing === raffle.id}
-                      className="flex-1 flex items-center justify-center gap-2 bg-yellow-500/10 text-yellow-400 py-2.5 rounded-xl text-xs font-bold border border-yellow-500/20 disabled:opacity-40"
-                    >
-                      {drawing === raffle.id ? <Loader2 size={13} className="animate-spin" /> : <Shuffle size={13} />}
-                      Sortear
-                    </button>
+                    <>
+                      <Link to={`/draw/${raffle.id}`} target="_blank" className="p-2.5 bg-slate-800 text-indigo-400 rounded-xl border border-slate-700">
+                        <Radio size={13}/>
+                      </Link>
+                      <button
+                        onClick={() => handleDraw(raffle)}
+                        disabled={drawing === raffle.id}
+                        className="p-2.5 bg-yellow-500/10 text-yellow-400 rounded-xl border border-yellow-500/20 disabled:opacity-40"
+                      >
+                        {drawing === raffle.id ? <Loader2 size={13} className="animate-spin" /> : <Shuffle size={13} />}
+                      </button>
+                    </>
                   )}
                   <button onClick={() => handleDelete(raffle.id)} disabled={deleting === raffle.id} className="p-2.5 bg-slate-800 text-red-400 rounded-xl border border-slate-700 disabled:opacity-40">
                     <Trash2 size={13} />
