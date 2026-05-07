@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft, Trophy, Users, DollarSign, Ticket,
@@ -9,8 +9,9 @@ import WhatsAppModal from "../components/WhatsAppModal";
 import { fetchUserProfile } from "../lib/firebaseService";
 import { Raffle, Order, User } from "../types";
 import {
-  getRaffle, getRaffleOrders, performDraw, tsToDate,
+  getRaffle, getRaffleOrders, performDraw, scheduleDrawCountdown, tsToDate,
 } from "../lib/firebaseService";
+import { DrawAnimation } from "./DrawLive";
 
 export default function RaffleManage({ user }: { user: User | null }) {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,9 @@ export default function RaffleManage({ user }: { user: User | null }) {
   const [drawing, setDrawing] = useState(false);
   const [drawResult, setDrawResult] = useState<{ number: number; name: string } | null>(null);
   const [wpData, setWpData] = useState<{ user: User | null; templateType: "winner"|"payment"|"reminder"|"custom"; order?: Order } | null>(null);
+  const [countdown,    setCountdown]    = useState<number | null>(null);
+  const [drawLiveData, setDrawLiveData] = useState<{ winnerNumber: number; winnerName: string; soldNumbers: number[] } | null>(null);
+  const countdownRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
     if (!id) return;
@@ -35,17 +39,40 @@ export default function RaffleManage({ user }: { user: User | null }) {
   const handleDraw = async () => {
     if (!raffle) return;
     if (orders.length === 0) { alert("Nenhum número vendido ainda."); return; }
-    if (!confirm(`Realizar o sorteio de "${raffle.title}"? Esta ação é irreversível.`)) return;
-    setDrawing(true);
-    try {
-      const result = await performDraw(raffle.id);
-      setDrawResult({ number: result.winnerNumber, name: result.winnerName });
-      await load();
-    } catch (e: unknown) {
-      alert((e as Error).message ?? "Erro ao sortear.");
-    } finally {
-      setDrawing(false);
-    }
+    if (!confirm(`Iniciar contagem regressiva de 1 minuto para "${raffle.title}"?\n\nCompartilhe o link ao vivo com os participantes antes de confirmar!`)) return;
+
+    // Salva timestamp no Firestore para sincronizar a página ao vivo
+    await scheduleDrawCountdown(raffle.id);
+
+    // Inicia contador local
+    const startMs = Date.now();
+    const getRemaining = () => Math.max(0, 60 - Math.floor((Date.now() - startMs) / 1000));
+
+    setCountdown(getRemaining());
+
+    countdownRef.current = setInterval(async () => {
+      const rem = getRemaining();
+      setCountdown(rem);
+
+      if (rem <= 0) {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        setCountdown(null);
+        setDrawing(true);
+        try {
+          const result = await performDraw(raffle.id);
+          setDrawLiveData({
+            winnerNumber: result.winnerNumber,
+            winnerName:   result.winnerName,
+            soldNumbers:  raffle.soldNumbers,
+          });
+        } catch (e: unknown) {
+          alert((e as Error).message ?? "Erro ao sortear.");
+          await load();
+        } finally {
+          setDrawing(false);
+        }
+      }
+    }, 500);
   };
 
   if (loading)
@@ -343,6 +370,60 @@ export default function RaffleManage({ user }: { user: User | null }) {
           Ver página pública da rifa
         </Link>
       </div>
+
+      {/* Countdown Modal */}
+      {countdown !== null && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl">
+          <div className="bg-slate-900 w-full max-w-sm rounded-[2rem] border border-slate-800 shadow-2xl p-8 text-center space-y-5">
+            <div className="text-4xl">⏳</div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sorteio começando em</p>
+            <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
+              <svg viewBox="0 0 180 180" className="absolute inset-0 w-full h-full" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="90" cy="90" r="78" fill="none" stroke="#1e1e2e" strokeWidth="10"/>
+                <circle cx="90" cy="90" r="78" fill="none" stroke="#6366f1" strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 78}`}
+                  strokeDashoffset={`${2 * Math.PI * 78 * (1 - countdown / 60)}`}
+                  style={{ transition: "stroke-dashoffset 0.8s linear" }}
+                />
+              </svg>
+              <div className="relative z-10 text-center">
+                <p className="text-5xl font-black text-white tabular-nums leading-none">
+                  {String(countdown).padStart(2,"0")}
+                </p>
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">seg</p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-white line-clamp-1">{raffle.title}</p>
+              <a href={`/draw/${raffle.id}`} target="_blank"
+                className="text-xs text-indigo-400 hover:underline font-bold flex items-center justify-center gap-1">
+                📡 Abrir link ao vivo
+              </a>
+            </div>
+            <button
+              onClick={() => { if (countdownRef.current) clearInterval(countdownRef.current); setCountdown(null); }}
+              className="text-xs text-slate-500 hover:text-red-400 font-bold uppercase tracking-widest transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Draw Animation */}
+      {drawLiveData && (
+        <DrawAnimation
+          soldNumbers={drawLiveData.soldNumbers.length > 0 ? drawLiveData.soldNumbers : [drawLiveData.winnerNumber]}
+          winnerNumber={drawLiveData.winnerNumber}
+          winnerName={drawLiveData.winnerName}
+          onComplete={async () => {
+            setDrawResult({ number: drawLiveData.winnerNumber, name: drawLiveData.winnerName });
+            setDrawLiveData(null);
+            await load();
+          }}
+        />
+      )}
 
       {/* WhatsApp Modal */}
       {wpData && (
