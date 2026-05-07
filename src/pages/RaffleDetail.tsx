@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "motion/react";
 import CompleteProfileModal from "../components/CompleteProfileModal";
 import PaymentModal from "../components/PaymentModal";
+import OrderConfirmModal from "../components/OrderConfirmModal";
 import {
   Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
   CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
@@ -30,6 +31,7 @@ export default function RaffleDetail({ user }: Props) {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(user);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [confirmData, setConfirmData] = useState<{ orderId: string; numbers: number[]; total: number; status: "paid"|"pending" } | null>(null);
   const [pixData, setPixData] = useState<{ qrCode: string; qrBase64: string; paymentId: number } | null>(null);
   const [pixStatus, setPixStatus] = useState<"pending"|"approved"|"error">("pending");
   const [payMethod, setPayMethod] = useState<"pix"|"card">("pix");
@@ -593,6 +595,20 @@ export default function RaffleDetail({ user }: Props) {
         </div>
       </div>
 
+      {/* ── Order Confirmation Modal ── */}
+      {confirmData && raffle && (
+        <OrderConfirmModal
+          orderId={confirmData.orderId}
+          raffleTitle={raffle.title}
+          raffleId={raffle.id}
+          numbers={confirmData.numbers}
+          totalAmount={confirmData.total}
+          status={confirmData.status}
+          paidAt={confirmData.status === "paid" ? new Date() : undefined}
+          onClose={() => setConfirmData(null)}
+        />
+      )}
+
       {/* ── Payment Modal (rifas reais) ── */}
       {showPaymentModal && raffle && currentUser && (
         <PaymentModal
@@ -602,11 +618,11 @@ export default function RaffleDetail({ user }: Props) {
           qtd={selectedNumbers.length}
           user={currentUser}
           selectedNumbers={selectedNumbers}
-          onSuccess={async () => {
+          onSuccess={async (orderId, numbers, total, status) => {
             setShowPaymentModal(false);
+            setConfirmData({ orderId, numbers, total, status });
             setSelectedNumbers([]);
-            setModal("success");
-            // Atualiza soldNumbers
+            // Atualiza rifa
             if (raffle) {
               const updated = await import("../lib/firebaseService").then(m => m.getRaffle(raffle.id));
               if (updated) setRaffle(updated);
