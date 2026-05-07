@@ -5,11 +5,13 @@ import {
   Save, ArrowLeft, Loader2, Image as ImageIcon,
   Upload, X, DollarSign, Calendar, Hash,
   FlaskConical, CheckCircle2, Ticket, LinkIcon,
-  AlertTriangle, Tag,
+  AlertTriangle, Tag, Package,
 } from "lucide-react";
 import { User, Raffle } from "../types";
 import { getRaffle, updateRaffle } from "../lib/firebaseService";
 import CategorySelector from "../components/CategorySelector";
+import PackagesEditor from "../components/PackagesEditor";
+import { RafflePackage } from "../types";
 import { uploadImageToImgBB } from "../lib/imgbb";
 
 interface Props { user: User | null }
@@ -37,6 +39,8 @@ export default function EditRaffle({ user }: Props) {
   const [images,      setImages]      = useState<string[]>([]);
   const [isTest,      setIsTest]      = useState(false);
   const [category,    setCategory]    = useState("");
+  const [minQuantity, setMinQuantity] = useState(1);
+  const [packages,    setPackages]    = useState<RafflePackage[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -54,6 +58,8 @@ export default function EditRaffle({ user }: Props) {
       setImages(r.images?.filter(Boolean) ?? []);
       setIsTest(r.isTest ?? false);
       setCategory((r as any).category ?? "");
+      setMinQuantity((r as any).minQuantity ?? 1);
+      setPackages((r as any).packages ?? []);
       setLoading(false);
     });
   }, [id]);
@@ -96,6 +102,8 @@ export default function EditRaffle({ user }: Props) {
         images,
         isTest,
         category: category || "Outros",
+        minQuantity: minQuantity || 1,
+        packages: packages.length > 0 ? packages : [],
       });
       setSaved(true);
       setTimeout(() => { setSaved(false); navigate(`/dashboard/raffle/${id}`); }, 1500);
@@ -194,6 +202,28 @@ export default function EditRaffle({ user }: Props) {
             {/* Categoria */}
             <Field icon={<Tag size={15}/>} label="Categoria">
               <CategorySelector value={category} onChange={setCategory}/>
+            </Field>
+
+            {/* Mínimo de cotas */}
+            <Field icon={<Hash size={15}/>} label="Mínimo de cotas por compra">
+              <div className="flex items-center gap-3">
+                <input type="number" value={minQuantity}
+                  onChange={e => setMinQuantity(Math.max(1, parseInt(e.target.value)||1))}
+                  min="1" max="100"
+                  className={INPUT + " w-24 text-center font-black"}/>
+                <p className="text-xs text-slate-400">
+                  {minQuantity === 1 ? "Sem mínimo obrigatório" : `Participante deve comprar ao menos ${minQuantity} cotas`}
+                </p>
+              </div>
+            </Field>
+
+            {/* Pacotes */}
+            <Field icon={<Package size={15}/>} label="Pacotes de cotas (opcional)">
+              <PackagesEditor
+                pricePerUnit={parseFloat(pricePerNum) || 0}
+                packages={packages}
+                onChange={setPackages}
+              />
             </Field>
 
             {/* Modo */}
