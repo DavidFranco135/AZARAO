@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import {
   TrendingUp, Users, DollarSign, ChevronRight, PlusCircle,
   Ticket, BarChart3, Calendar, Trash2, Eye, Trophy,
-  FlaskConical, Shuffle, Loader2, Radio,
+  FlaskConical, Shuffle, Loader2, Radio, Edit2,
 } from "lucide-react";
 import { DrawAnimation } from "./DrawLive";
 import { User, DashboardRaffle } from "../types";
