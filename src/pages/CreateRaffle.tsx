@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { User } from "../types";
 import CategorySelector from "../components/CategorySelector";
+import PackagesEditor from "../components/PackagesEditor";
+import { RafflePackage } from "../types";
 import CreatorTermsModal from "../components/CreatorTermsModal";
 import { createRaffle, getCommissionRate, markCreatorTermsAccepted } from "../lib/firebaseService";
 import { uploadImageToImgBB } from "../lib/imgbb";
@@ -33,6 +35,8 @@ export default function CreateRaffle({ user }: { user: User | null }) {
   const [taxaPlat,    setTaxaPlat]    = useState<number>(10);
   const [error,       setError]       = useState("");
   const [category,    setCategory]    = useState("");
+  const [minQuantity, setMinQuantity] = useState(1);
+  const [packages,    setPackages]    = useState<RafflePackage[]>([]);
   const [showTerms,   setShowTerms]   = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -89,6 +93,8 @@ export default function CreateRaffle({ user }: { user: User | null }) {
         drawDate,
         images: images.length > 0 ? images : imageUrl ? [imageUrl] : [],
         category: category || "Outros",
+        minQuantity: minQuantity || 1,
+        packages: packages.length > 0 ? packages : undefined,
         creatorId: user.id, creatorName: user.name,
         commissionPercentage: taxaPlat,
         isTest,
@@ -179,6 +185,27 @@ export default function CreateRaffle({ user }: { user: User | null }) {
 
               <FieldWrap label="Categoria">
                 <CategorySelector value={category} onChange={setCategory}/>
+              </FieldWrap>
+
+              <FieldWrap label="Mínimo de cotas por compra">
+                <div className="flex items-center gap-3">
+                  <input type="number" value={minQuantity} onChange={e => setMinQuantity(Math.max(1, parseInt(e.target.value)||1))}
+                    min="1" max="100"
+                    className="w-24 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500 text-center font-black"/>
+                  <div>
+                    <p className="text-xs text-white font-bold">{minQuantity === 1 ? "Sem mínimo" : `Mínimo ${minQuantity} cotas`}</p>
+                    <p className="text-[10px] text-slate-500">Participante deve comprar ao menos {minQuantity} cota(s)</p>
+                  </div>
+                </div>
+              </FieldWrap>
+
+              <FieldWrap label="Pacotes de cotas (opcional)">
+                <p className="text-[10px] text-slate-500 mb-3">Crie pacotes com quantidade fixa e desconto. Se não criar, o participante escolhe livremente.</p>
+                <PackagesEditor
+                  pricePerUnit={parseFloat(pricePerNum) || 0}
+                  packages={packages}
+                  onChange={setPackages}
+                />
               </FieldWrap>
 
               <FieldWrap label={`Fotos do Prêmio (${images.length}/8)`}>
