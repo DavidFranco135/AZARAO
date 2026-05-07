@@ -613,7 +613,6 @@ export default function RaffleDetail({ user }: Props) {
             }
           }}
           onClose={() => setShowPaymentModal(false)}
-          selectedNumbers={selectedNumbers}
         />
       )}
 
