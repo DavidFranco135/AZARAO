@@ -6,6 +6,7 @@ import {
   X, ImageIcon, Loader2,
 } from "lucide-react";
 import { User } from "../types";
+import CategorySelector from "../components/CategorySelector";
 import CreatorTermsModal from "../components/CreatorTermsModal";
 import { createRaffle, getCommissionRate, markCreatorTermsAccepted } from "../lib/firebaseService";
 import { uploadImageToImgBB } from "../lib/imgbb";
@@ -31,6 +32,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
   const [submitting,  setSubmitting]  = useState(false);
   const [taxaPlat,    setTaxaPlat]    = useState<number>(10);
   const [error,       setError]       = useState("");
+  const [category,    setCategory]    = useState("");
   const [showTerms,   setShowTerms]   = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -86,6 +88,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
         totalNumbers: qtdNum,
         drawDate,
         images: images.length > 0 ? images : imageUrl ? [imageUrl] : [],
+        category: category || "Outros",
         creatorId: user.id, creatorName: user.name,
         commissionPercentage: taxaPlat,
         isTest,
@@ -172,6 +175,10 @@ export default function CreateRaffle({ user }: { user: User | null }) {
                   onChange={(e) => setDescription(e.target.value)}
                   className={INPUT + " resize-none"}
                 />
+              </FieldWrap>
+
+              <FieldWrap label="Categoria">
+                <CategorySelector value={category} onChange={setCategory}/>
               </FieldWrap>
 
               <FieldWrap label={`Fotos do Prêmio (${images.length}/8)`}>
