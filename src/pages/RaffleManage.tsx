@@ -6,6 +6,7 @@ import {
   Shuffle, Loader2, Eye, BarChart3, FlaskConical, MessageCircle,
 } from "lucide-react";
 import WhatsAppModal from "../components/WhatsAppModal";
+import UserDetailsModal from "../components/UserDetailsModal";
 import { fetchUserProfile } from "../lib/firebaseService";
 import { Raffle, Order, User } from "../types";
 import {
@@ -21,6 +22,7 @@ export default function RaffleManage({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(true);
   const [drawing, setDrawing] = useState(false);
   const [drawResult, setDrawResult] = useState<{ number: number; name: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<(User & { createdAt?: unknown }) | null>(null);
   const [wpData, setWpData] = useState<{ user: User | null; templateType: "winner"|"payment"|"reminder"|"custom"; order?: Order } | null>(null);
   const [countdown,    setCountdown]    = useState<number | null>(null);
   const [drawLiveData, setDrawLiveData] = useState<{ winnerNumber: number; winnerName: string; soldNumbers: number[] } | null>(null);
@@ -141,7 +143,14 @@ export default function RaffleManage({ user }: { user: User | null }) {
                 {raffle.status === "active" ? "● Ativa" : "● Encerrada"}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black text-white">{raffle.title}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl sm:text-4xl font-black text-white">{raffle.title}</h1>
+              {(raffle as any).raffleCode && (
+                <span className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20">
+                  #{(raffle as any).raffleCode}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3 mt-2 text-slate-400 text-sm">
               <Calendar size={14} className="text-indigo-400" />
               <span>Sorteio: {tsToDate(raffle.drawDate).toLocaleDateString("pt-BR")}</span>
@@ -254,7 +263,7 @@ export default function RaffleManage({ user }: { user: User | null }) {
                           <div className="w-8 h-8 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-xs font-black shrink-0">
                             {(o.userName ?? "?").charAt(0).toUpperCase()}
                           </div>
-                          <span className="text-sm font-medium text-white">{o.userName ?? "—"}</span>
+                          <button onClick={async () => { const { fetchUserProfile } = await import("../lib/firebaseService"); const u = await fetchUserProfile(o.userId); if (u) setSelectedUser(u); }} className="text-sm font-medium text-white hover:text-indigo-400 transition-colors">{o.userName ?? "—"}</button>
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -417,12 +426,24 @@ export default function RaffleManage({ user }: { user: User | null }) {
           soldNumbers={drawLiveData.soldNumbers.length > 0 ? drawLiveData.soldNumbers : [drawLiveData.winnerNumber]}
           winnerNumber={drawLiveData.winnerNumber}
           winnerName={drawLiveData.winnerName}
+          totalNumbers={raffle?.totalNumbers}
           onComplete={async () => {
             setDrawResult({ number: drawLiveData.winnerNumber, name: drawLiveData.winnerName });
             setDrawLiveData(null);
             await load();
           }}
         />
+      )}
+
+      {selectedUser && (
+        <UserDetailsModal
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
+
+      {selectedUser && (
+        <UserDetailsModal user={selectedUser} onClose={() => setSelectedUser(null)} />
       )}
 
       {/* WhatsApp Modal */}
