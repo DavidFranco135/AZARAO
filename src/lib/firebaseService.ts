@@ -108,7 +108,6 @@ export const cancelOrderAndRelease = async (
   raffleId: string,
   numbers: number[],
 ): Promise<void> => {
-  const { arrayRemove } = await import("firebase/firestore");
   await updateDoc(doc(db, "orders", orderId), { status: "cancelled" });
   await updateDoc(doc(db, "raffles", raffleId), {
     soldNumbers: arrayRemove(...numbers),
