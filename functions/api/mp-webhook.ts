@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function
- * Arquivo: functions/api/mp-webhook.ts  (raiz do repositório)
- * Handler universal — aceita GET, POST e qualquer método do MP IPN/Webhook
+ * Caminho no repositório: functions/api/mp-webhook.ts
+ * IMPORTANTE: o arquivo deve estar na pasta /functions/api/ na RAIZ do repositório
  */
 
 interface Env {
@@ -20,7 +20,7 @@ async function updateFirestore(orderId: string, paymentId: string, env: Env) {
     },
     body: JSON.stringify({
       fields: {
-        status: { stringValue: "paid" },
+        status:      { stringValue: "paid" },
         mpPaymentId: { stringValue: String(paymentId) },
       },
     }),
@@ -28,72 +28,55 @@ async function updateFirestore(orderId: string, paymentId: string, env: Env) {
 }
 
 async function processPaymentId(id: string, env: Env) {
-  // ID "123456" é teste do painel MP — ignora sem chamar a API
-  if (id === "123456" || id === "0") return;
-
+  if (!id || id === "123456" || id === "0") return;
   const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
     headers: { Authorization: `Bearer ${env.MP_ACCESS_TOKEN}` },
   });
   if (!mpRes.ok) return;
-
-  const payment = (await mpRes.json()) as {
-    status: string;
-    external_reference: string;
-    id: number;
-  };
-
+  const payment = await mpRes.json() as { status: string; external_reference: string; id: number };
   if (payment.status !== "approved" || !payment.external_reference) return;
-
   await updateFirestore(payment.external_reference, String(payment.id), env);
 }
 
-// onRequest trata TODOS os métodos HTTP (GET, POST, etc.)
-export const onRequest: PagesFunction<Env> = async (context) => {
-  // Sempre responde 200 imediatamente — MP para de reenviar ao receber 200
-  const respond200 = new Response(JSON.stringify({ status: "ok" }), {
+export const onRequestGet: PagesFunction<Env> = async (ctx) => {
+  const url = new URL(ctx.request.url);
+  const topic = url.searchParams.get("topic");
+  const id    = url.searchParams.get("id");
+  if (topic === "payment" && id) {
+    ctx.waitUntil(processPaymentId(id, ctx.env));
+  }
+  return new Response(JSON.stringify({ status: "ok" }), {
     status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
   });
+};
 
+export const onRequestPost: PagesFunction<Env> = async (ctx) => {
   try {
-    const reqUrl = new URL(context.request.url);
-    const method = context.request.method.toUpperCase();
+    const url   = new URL(ctx.request.url);
+    const topic = url.searchParams.get("topic");
+    const id    = url.searchParams.get("id");
 
-    let paymentId: string | null = null;
-
-    // Formato 1 — IPN via query params: ?topic=payment&id=XXX  (GET ou POST)
-    const topicParam = reqUrl.searchParams.get("topic");
-    const idParam = reqUrl.searchParams.get("id");
-
-    if (topicParam === "payment" && idParam) {
-      paymentId = idParam;
-    }
-
-    // Formato 2 — Webhook novo via body JSON: { type: "payment", data: { id } }
-    if (!paymentId && method === "POST") {
-      try {
-        const body = (await context.request.json()) as {
-          type?: string;
-          data?: { id?: string };
-        };
-        if (body?.type === "payment" && body?.data?.id) {
-          paymentId = String(body.data.id);
-        }
-      } catch {
-        // body vazio ou não-JSON — ignora
+    if (topic === "payment" && id) {
+      ctx.waitUntil(processPaymentId(id, ctx.env));
+    } else {
+      const body = await ctx.request.json() as { type?: string; data?: { id?: string } };
+      if (body?.type === "payment" && body?.data?.id) {
+        ctx.waitUntil(processPaymentId(String(body.data.id), ctx.env));
       }
     }
+  } catch { /* ignora erros de parse */ }
 
-    // Processa em background sem segurar a resposta
-    if (paymentId) {
-      context.waitUntil(processPaymentId(paymentId, context.env));
-    }
-  } catch (err) {
-    console.error("Webhook error:", err);
-  }
+  return new Response(JSON.stringify({ status: "ok" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+};
 
-  return respond200;
+// Fallback para qualquer outro método
+export const onRequest: PagesFunction<Env> = async () => {
+  return new Response(JSON.stringify({ status: "ok" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
 };
