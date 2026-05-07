@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { User, Raffle } from "../types";
 import { getRaffle, updateRaffle } from "../lib/firebaseService";
-import { uploadToImgBB } from "../lib/imgbb";
+import { uploadImageToImgBB } from "../lib/imgbb";
 
 interface Props { user: User | null }
 
@@ -69,7 +69,7 @@ export default function EditRaffle({ user }: Props) {
     const remaining = 8 - images.length;
     setUploading(true);
     for (const file of files.slice(0, remaining)) {
-      const url = await uploadToImgBB(file);
+      const url = await uploadImageToImgBB(file);
       if (url) setImages(p => [...p, url]);
     }
     setUploading(false);
