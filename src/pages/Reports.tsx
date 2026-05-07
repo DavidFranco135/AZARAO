@@ -16,6 +16,7 @@ interface RaffleRow {
   raffleId:         string;
   raffleCode:       string;
   title:            string;
+  isTest:           boolean;
   creatorId:        string;
   creatorName:      string;
   commissionPct:    number;
@@ -71,6 +72,7 @@ export default function Reports({ user }: Props) {
   const [search,    setSearch]    = useState("");
   const [showPicker,setShowPicker]= useState(false);
   const [selCreator,setSelCreator]= useState<string>("all");
+  const [raffleMode, setRaffleMode] = useState<"all"|"real"|"test">("real");
 
   const loadReport = useCallback(async () => {
     setLoading(true);
@@ -88,11 +90,18 @@ export default function Reports({ user }: Props) {
         return d >= start && d <= end;
       });
 
+      // Filtra por modo (real/teste)
+      const rafflesFiltered = allRaffles.filter((r) => {
+        if (raffleMode === "real") return !r.isTest;
+        if (raffleMode === "test") return r.isTest;
+        return true;
+      });
+
       // Para criadores: filtra apenas as rifas deles
-      const raffleMap = new Map(allRaffles.map((r) => [r.id, r]));
+      const raffleMap = new Map(rafflesFiltered.map((r) => [r.id, r]));
       const raffleIds = isAdmin
-        ? new Set(allRaffles.map(r => r.id))
-        : new Set(allRaffles.filter(r => r.creatorId === user?.id).map(r => r.id));
+        ? new Set(rafflesFiltered.map(r => r.id))
+        : new Set(rafflesFiltered.filter(r => r.creatorId === user?.id).map(r => r.id));
 
       // Agrupa pedidos por rifa
       const grouped = new Map<string, typeof paidOrders>();
@@ -117,6 +126,7 @@ export default function Reports({ user }: Props) {
           raffleId,
           raffleCode:    (raffle as any).raffleCode ?? "—",
           title:         raffle.title,
+          isTest:        raffle.isTest,
           creatorId:     raffle.creatorId,
           creatorName:   (raffle as any).creatorName ?? "Criador",
           commissionPct: commPct,
@@ -188,6 +198,17 @@ export default function Reports({ user }: Props) {
       </Link>
 
       {/* Header */}
+      {/* Mode indicator */}
+      {raffleMode !== "all" && (
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black border w-fit ${
+          raffleMode === "real"
+            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+        }`}>
+          {raffleMode === "real" ? "💰 Exibindo apenas rifas REAIS" : "🧪 Exibindo apenas rifas de TESTE"}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -240,6 +261,23 @@ export default function Reports({ user }: Props) {
             </div>
           </div>
         )}
+
+        {/* Filtro real/teste */}
+        <div className="flex items-center gap-2 pl-0">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipo:</span>
+          {([
+            { id: "real", label: "💰 Reais",   color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+            { id: "test", label: "🧪 Testes",  color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+            { id: "all",  label: "📋 Todos",   color: "bg-indigo-600 text-white" },
+          ] as {id:"all"|"real"|"test"; label:string; color:string}[]).map((m) => (
+            <button key={m.id} onClick={() => setRaffleMode(m.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                raffleMode === m.id ? m.color : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+              }`}>
+              {m.label}
+            </button>
+          ))}
+        </div>
 
         {/* Busca e filtro por criador */}
         <div className="flex flex-wrap gap-3 items-center pl-6">
@@ -320,10 +358,15 @@ export default function Reports({ user }: Props) {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <Link to={`/dashboard/raffle/${r.raffleId}`}
-                        className="text-sm font-medium text-white hover:text-indigo-400 transition-colors line-clamp-1 max-w-[180px] block">
-                        {r.title}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link to={`/dashboard/raffle/${r.raffleId}`}
+                          className="text-sm font-medium text-white hover:text-indigo-400 transition-colors line-clamp-1 max-w-[160px] block">
+                          {r.title}
+                        </Link>
+                        {(r as any).isTest && (
+                          <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 uppercase shrink-0">Teste</span>
+                        )}
+                      </div>
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-4">
