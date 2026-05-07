@@ -132,6 +132,8 @@ const INTRO_PHRASES = [
 ];
 
 // ─── Animação de sorteio ─────────────────────────────────────────────────────
+// Toda a lógica de timing em UM único useEffect com deps []
+// para evitar que mudanças de phase cancelem os timers via cleanup do React
 export function DrawAnimation({
   soldNumbers,
   winnerNumber,
@@ -146,79 +148,70 @@ export function DrawAnimation({
   totalNumbers?: number;
 }) {
   type Phase = "intro" | "spinning" | "slowing" | "reveal" | "done";
-  // Máximo para giro visual — usa totalNumbers se disponível
-  const maxNum = totalNumbers ?? Math.max(...soldNumbers, 100);
-
   const [phase,      setPhase]      = useState<Phase>("intro");
   const [phraseIdx,  setPhraseIdx]  = useState(0);
-  const [displayNum, setDisplayNum] = useState(Math.floor(Math.random() * maxNum) + 1);
+  const [displayNum, setDisplayNum] = useState(1);
   const [confetti,   setConfetti]   = useState<{ id: number; x: number; color: string; size: number }[]>([]);
-  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spinStarted = useRef(false);
 
+  const maxNum = totalNumbers ?? Math.max(...soldNumbers, 100);
   const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f472b6"];
+  const INTRO_MS    = 900;
+  const SPIN_TOTAL  = 10000;
 
-  // Fase 1: frases de introdução
+  // ── ÚNICO useEffect com deps [] — nunca será cancelado por mudança de state ──
   useEffect(() => {
-    if (phase !== "intro") return;
-    let idx = 0;
-    const iv = setInterval(() => {
-      idx++;
-      if (idx < INTRO_PHRASES.length) {
-        setPhraseIdx(idx);
-      } else {
-        clearInterval(iv);
-        setPhase("spinning");
-      }
-    }, 900);
-    return () => clearInterval(iv);
-  }, [phase]);
-
-  // Fase 2: giro dos números — usa setTimeout recursivo para não depender de useEffect
-  useEffect(() => {
-    if (phase !== "spinning" || spinStarted.current) return;
-    spinStarted.current = true;
-
-    let speed = 60;
-    let elapsed = 0;
-    const total = 10000; // 10 segundos de giro
-
-    const tick = () => {
-      elapsed += speed;
-      setDisplayNum(Math.floor(Math.random() * maxNum) + 1);
-
-      if (elapsed > total * 0.55 && speed < 130) {
-        speed = 130;
-        setPhase("slowing");
-      }
-      if (elapsed > total * 0.82 && speed < 320) {
-        speed = 320;
-      }
-
-      if (elapsed >= total) {
-        setDisplayNum(winnerNumber);
-        setPhase("reveal");
-        setConfetti(
-          Array.from({ length: 80 }, (_, i) => ({
-            id: i,
-            x: Math.random() * 100,
-            color: COLORS[Math.floor(Math.random() * COLORS.length)],
-            size: 8 + Math.random() * 10,
-          }))
-        );
-        timerRef.current = setTimeout(() => {
-          setPhase("done");
-          onComplete?.();
-        }, 4000);
-        return;
-      }
-
-      timerRef.current = setTimeout(tick, speed);
+    let alive = true;
+    const T: ReturnType<typeof setTimeout>[] = [];
+    const after = (fn: () => void, ms: number) => {
+      const t = setTimeout(() => { if (alive) fn(); }, ms);
+      T.push(t);
     };
 
-    timerRef.current = setTimeout(tick, speed);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [phase]);
+    // 1) Intro — troca frase a cada 900ms
+    INTRO_PHRASES.forEach((_, i) => {
+      if (i > 0) after(() => setPhraseIdx(i), i * INTRO_MS);
+    });
+    const introEnd = INTRO_PHRASES.length * INTRO_MS;
+
+    // 2) Inicia spinning após intro
+    after(() => setPhase("spinning"), introEnd);
+
+    // 3) Ticks de spin — agendados com setTimeout recursivo interno
+    after(() => {
+      let elapsed = 0;
+      let speed   = 60;
+      const tick = () => {
+        if (!alive) return;
+        setDisplayNum(Math.floor(Math.random() * maxNum) + 1);
+        elapsed += speed;
+        if (elapsed >= SPIN_TOTAL * 0.60 && speed === 60)  { speed = 130; setPhase("slowing"); }
+        if (elapsed >= SPIN_TOTAL * 0.85 && speed === 130) { speed = 320; }
+        if (elapsed < SPIN_TOTAL) { const t = setTimeout(tick, speed); T.push(t); }
+      };
+      const t = setTimeout(tick, speed);
+      T.push(t);
+    }, introEnd + 50);
+
+    // 4) Reveal
+    after(() => {
+      setDisplayNum(winnerNumber);
+      setPhase("reveal");
+      setConfetti(Array.from({ length: 80 }, (_, i) => ({
+        id: i, x: Math.random() * 100,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        size: 8 + Math.random() * 10,
+      })));
+    }, introEnd + SPIN_TOTAL + 50);
+
+    // 5) Done — chama onComplete
+    after(() => {
+      setPhase("done");
+      onComplete?.();
+    }, introEnd + SPIN_TOTAL + 4000);
+
+    return () => { alive = false; T.forEach(clearTimeout); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // <-- deps vazias: roda UMA VEZ, nunca cancela por mudança de state
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col items-center justify-center px-4 overflow-hidden">
@@ -236,7 +229,7 @@ export function DrawAnimation({
         />
       ))}
 
-      {/* FASE INTRO */}
+      {/* INTRO */}
       {phase === "intro" && (
         <motion.div key={phraseIdx}
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -248,7 +241,7 @@ export function DrawAnimation({
           <p className="text-2xl sm:text-4xl font-black text-white tracking-tight px-4">
             {INTRO_PHRASES[phraseIdx]}
           </p>
-          <div className="flex justify-center gap-2 mt-4">
+          <div className="flex justify-center gap-2">
             {INTRO_PHRASES.map((_, i) => (
               <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${
                 i === phraseIdx ? "w-8 bg-indigo-400" : i < phraseIdx ? "w-2 bg-indigo-700" : "w-2 bg-slate-800"
@@ -258,7 +251,7 @@ export function DrawAnimation({
         </motion.div>
       )}
 
-      {/* FASE SPINNING / SLOWING / REVEAL */}
+      {/* SPINNING / SLOWING / REVEAL */}
       {phase !== "intro" && (
         <motion.div className="text-center space-y-6"
           initial={{ scale: 0.8, opacity: 0 }}
