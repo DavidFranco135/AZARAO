@@ -28,7 +28,9 @@ export interface Raffle {
   winnerId?: string;
   winnerName?: string;
   drawnAt?: unknown;
-  drawScheduledAt?: unknown; // timestamp quando criador agendou o sorteio
+  drawScheduledAt?: unknown;
+  raffleCode?: string;  // código único ex: AZ-2026-A3B9
+  deleted?: boolean;    // soft delete
 }
 
 export interface Order {
