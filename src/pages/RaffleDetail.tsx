@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import CompleteProfileModal from "../components/CompleteProfileModal";
 import PaymentModal from "../components/PaymentModal";
 import OrderConfirmModal from "../components/OrderConfirmModal";
+import ImageGallery from "../components/ImageGallery";
 import {
   Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
   CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
