@@ -181,6 +181,18 @@ export const updateRaffle = async (id: string, data: Partial<Raffle>) => {
   await updateDoc(doc(db, "raffles", id), data as Record<string, unknown>);
 };
 
+/** Busca TODAS as rifas — admin/relatório */
+export const getAllRafflesAdmin = async (): Promise<Raffle[]> => {
+  const snap = await getDocs(collection(db, "raffles"));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Raffle);
+};
+
+/** Busca TODOS os pedidos — admin/relatório */
+export const getAllOrdersAdmin = async (): Promise<Order[]> => {
+  const snap = await getDocs(collection(db, "orders"));
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order);
+};
+
 export const deleteRaffle = async (id: string) => {
   // Soft delete — mantém no banco para histórico do admin
   await updateDoc(doc(db, "raffles", id), { deleted: true });
