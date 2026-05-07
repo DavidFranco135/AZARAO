@@ -30,6 +30,7 @@ export interface Raffle {
   drawnAt?: unknown;
   drawScheduledAt?: unknown;
   raffleCode?: string;  // código único ex: AZ-2026-A3B9
+  category?: string;    // categoria da rifa
   deleted?: boolean;    // soft delete
 }
 
