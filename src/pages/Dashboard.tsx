@@ -425,6 +425,7 @@ export default function Dashboard({ user }: { user: User | null }) {
           soldNumbers={drawLiveData.raffle.soldNumbers}
           winnerNumber={drawLiveData.raffle.winnerNumber}
           winnerName={drawLiveData.raffle.winnerName ?? "Ganhador"}
+          totalNumbers={drawLiveData.raffle.totalNumbers}
           onComplete={async () => {
             setDrawResult({
               raffleTitle: drawLiveData.raffle.title,
