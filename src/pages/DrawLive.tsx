@@ -160,7 +160,8 @@ export function DrawAnimation({
 
   // ── ÚNICO useEffect com deps [] — nunca será cancelado por mudança de state ──
   useEffect(() => {
-    let alive = true;
+    let alive    = true;
+    let revealed = false; // impede que ticks sobrescrevam o número vencedor
     const T: ReturnType<typeof setTimeout>[] = [];
     const after = (fn: () => void, ms: number) => {
       const t = setTimeout(() => { if (alive) fn(); }, ms);
@@ -176,42 +177,48 @@ export function DrawAnimation({
     // 2) Inicia spinning após intro
     after(() => setPhase("spinning"), introEnd);
 
-    // 3) Ticks de spin — agendados com setTimeout recursivo interno
+    // 3) Ticks de spin com velocidade crescente
     after(() => {
       let elapsed = 0;
       let speed   = 60;
       const tick = () => {
-        if (!alive) return;
+        if (!alive || revealed) return; // para imediatamente ao revelar
         setDisplayNum(Math.floor(Math.random() * maxNum) + 1);
         elapsed += speed;
         if (elapsed >= SPIN_TOTAL * 0.60 && speed === 60)  { speed = 130; setPhase("slowing"); }
         if (elapsed >= SPIN_TOTAL * 0.85 && speed === 130) { speed = 320; }
-        if (elapsed < SPIN_TOTAL) { const t = setTimeout(tick, speed); T.push(t); }
+        if (elapsed < SPIN_TOTAL) {
+          const t = setTimeout(tick, speed);
+          T.push(t);
+        }
+        // Quando termina: garante que o número final random não apareça — reveal cuida disso
       };
       const t = setTimeout(tick, speed);
       T.push(t);
     }, introEnd + 50);
 
-    // 4) Reveal
+    // 4) Reveal — marca como revelado ANTES de atualizar o número
     after(() => {
-      setDisplayNum(winnerNumber);
+      revealed = true;           // bloqueia qualquer tick residual
+      setDisplayNum(winnerNumber); // define o vencedor de forma definitiva
       setPhase("reveal");
       setConfetti(Array.from({ length: 80 }, (_, i) => ({
-        id: i, x: Math.random() * 100,
+        id: i,
+        x: Math.random() * 100,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
         size: 8 + Math.random() * 10,
       })));
-    }, introEnd + SPIN_TOTAL + 50);
+    }, introEnd + SPIN_TOTAL + 100);
 
-    // 5) Done — chama onComplete
+    // 5) Done — chama onComplete após 4s de exibição do vencedor
     after(() => {
       setPhase("done");
       onComplete?.();
-    }, introEnd + SPIN_TOTAL + 4000);
+    }, introEnd + SPIN_TOTAL + 4500);
 
     return () => { alive = false; T.forEach(clearTimeout); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // <-- deps vazias: roda UMA VEZ, nunca cancela por mudança de state
+  }, []); // deps vazias: roda UMA VEZ ao montar
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col items-center justify-center px-4 overflow-hidden">
