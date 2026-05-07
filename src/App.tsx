@@ -16,6 +16,7 @@ import RaffleManage from "./pages/RaffleManage";
 import DrawLive from "./pages/DrawLive";
 import Terms from "./pages/Terms";
 import Reports from "./pages/Reports";
+import EditRaffle from "./pages/EditRaffle";
 import Privacy from "./pages/Privacy";
 import { User } from "./types";
 
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="/create-raffle" element={user ? <CreateRaffle user={user} /> : <Navigate to="/login" />} />
               <Route path="/dashboard/raffle/:id" element={user ? <RaffleManage user={user} /> : <Navigate to="/login" />} />
               <Route path="/draw/:id" element={<DrawLive />} />
+              <Route path="/edit-raffle/:id" element={<EditRaffle user={user} />} />
               <Route path="/reports" element={<Reports user={user} />} />
               <Route path="/my-reports" element={<Reports user={user} />} />
               <Route path="/termos" element={<Terms />} />
