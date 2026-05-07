@@ -5,7 +5,7 @@ import {
   Ticket, Calendar, Trophy, Users, TrendingUp,
   ShieldCheck, Zap, ArrowRight, PlusCircle,
   ChevronLeft, ChevronRight, Star, LayoutDashboard,
-  BarChart3, Flame, Clock, Sparkles,
+  BarChart3, Flame, Tag, Clock, Sparkles,
 } from "lucide-react";
 import { Raffle, User } from "../types";
 import {
@@ -217,59 +217,60 @@ function HeroCarousel({ raffles }: { raffles: Raffle[] }) {
 }
 
 // ─── Página PÚBLICA (visitante ou participante logado) ───────────────────────
-type FilterTab = "todos" | "novos" | "encerrando" | "populares";
-
 function PublicHome({ user }: { user: User | null }) {
   const [allRaffles, setAllRaffles] = useState<Raffle[]>([]);
   const [winners,    setWinners]    = useState<Raffle[]>([]);
-  const [filter,     setFilter]     = useState<FilterTab>("todos");
+  const [activeTab,  setActiveTab]  = useState("Destaques");
   const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
     getRaffles().then((all) => {
-      setAllRaffles(all.filter((r) => r.status === "active"));
-      setWinners(all.filter((r) => r.status === "finished" && r.winnerName).slice(0,5));
+      const active = all.filter((r) => r.status === "active");
+      setAllRaffles(active);
+      setWinners(all.filter((r) => r.status === "finished" && r.winnerName).slice(0, 5));
+      // Tab inicial: Destaques se existir, senão a primeira categoria disponível
+      const cats = getCategoryTabs(active);
+      if (cats.length > 0) setActiveTab(cats[0]);
       setLoading(false);
     });
   }, []);
 
-  // Filtragem
+  const getCategoryTabs = (raffles: Raffle[]) => {
+    const cats = new Set<string>();
+    cats.add("Todos");
+    // Destaques primeiro se existir
+    if (raffles.some(r => (r as any).category === "Destaques")) cats.delete("Todos");
+    raffles.forEach(r => {
+      const cat = (r as any).category;
+      if (cat) cats.add(cat);
+    });
+    if (raffles.length > 0) cats.add("Todos");
+    // Reordena: Destaques primeiro, depois alfabético, Todos por último
+    const arr = Array.from(cats);
+    arr.sort((a, b) => {
+      if (a === "Destaques") return -1;
+      if (b === "Destaques") return  1;
+      if (a === "Todos")     return  1;
+      if (b === "Todos")     return -1;
+      return a.localeCompare(b, "pt");
+    });
+    return arr;
+  };
+
+  const tabs = getCategoryTabs(allRaffles);
+  const featured = allRaffles.filter(r => (r as any).category === "Destaques" || (!((r as any).category) && allRaffles.indexOf(r) < 5));
+
+  const filtered = activeTab === "Todos"
+    ? allRaffles
+    : allRaffles.filter(r => (r as any).category === activeTab || (!((r as any).category) && activeTab === "Outros"));
+
   const now = Date.now();
-  const filtered: Raffle[] = (() => {
-    switch (filter) {
-      case "novos":
-        return [...allRaffles].sort((a,b) => tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime());
-      case "encerrando":
-        return [...allRaffles]
-          .filter((r) => {
-            const d = tsToDate(r.drawDate).getTime();
-            return d > now && d - now < 7 * 24 * 60 * 60 * 1000; // próximos 7 dias
-          })
-          .sort((a,b) => tsToDate(a.drawDate).getTime() - tsToDate(b.drawDate).getTime());
-      case "populares":
-        return [...allRaffles].sort((a,b) => b.soldNumbers.length - a.soldNumbers.length);
-      default:
-        return allRaffles;
-    }
-  })();
-
-  // Featured = 3 mais populares para o carrossel
-  const featured = [...allRaffles]
-    .sort((a,b) => b.soldNumbers.length - a.soldNumbers.length)
-    .slice(0, 5);
-
-  const TABS: { id: FilterTab; label: string; icon: React.ReactNode }[] = [
-    { id:"todos",       label:"Todos",       icon:<Sparkles size={13}/> },
-    { id:"novos",       label:"Novos",       icon:<Zap size={13}/> },
-    { id:"encerrando",  label:"Encerrando",  icon:<Clock size={13}/> },
-    { id:"populares",   label:"Populares",   icon:<Flame size={13}/> },
-  ];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <div className="max-w-2xl mx-auto px-4 pb-16">
 
-        {/* ── Hero texto ─────────────────────────────────────────── */}
+        {/* Hero */}
         <div className="pt-8 pb-6 text-center">
           <div className="inline-flex items-center gap-2 bg-indigo-500/10 text-indigo-400 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest mb-5 border border-indigo-500/20">
             <Zap size={13}/> Sorteios Online Seguros
@@ -280,7 +281,7 @@ function PublicHome({ user }: { user: User | null }) {
           <p className="text-slate-400 text-sm sm:text-base mb-6">
             Participe dos melhores sorteios com segurança e transparência.
           </p>
-          {!user && (
+          {!user ? (
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link to="/register" className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-2xl font-bold text-base shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
                 <span>Criar Conta Grátis</span> <ChevronRight size={18}/>
@@ -289,8 +290,7 @@ function PublicHome({ user }: { user: User | null }) {
                 Ver Sorteios
               </a>
             </div>
-          )}
-          {user && (
+          ) : (
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a href="#rifas" className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3.5 rounded-2xl font-bold text-base shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-2">
                 <Ticket size={18}/> Participar Agora
@@ -302,7 +302,7 @@ function PublicHome({ user }: { user: User | null }) {
           )}
         </div>
 
-        {/* ── Stats ──────────────────────────────────────────────── */}
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
             { icon:<TrendingUp size={15}/>, label:"Arrecadado", value:"R$ 2.4M+" },
@@ -319,7 +319,7 @@ function PublicHome({ user }: { user: User | null }) {
 
         {loading ? (
           <div className="space-y-4">
-            {[1,2,3].map((i) => <div key={i} className="h-64 bg-slate-900 rounded-3xl border border-slate-800 animate-pulse"/>)}
+            {[1,2,3].map(i => <div key={i} className="h-48 bg-slate-900 rounded-3xl border border-slate-800 animate-pulse"/>)}
           </div>
         ) : allRaffles.length === 0 ? (
           <div className="text-center py-20">
@@ -328,7 +328,7 @@ function PublicHome({ user }: { user: User | null }) {
           </div>
         ) : (
           <>
-            {/* ── Carrossel em destaque ─────────────────────────── */}
+            {/* Carrossel destaques */}
             {featured.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
@@ -339,40 +339,46 @@ function PublicHome({ user }: { user: User | null }) {
               </div>
             )}
 
-            {/* ── Abas de filtro ────────────────────────────────── */}
-            <div id="rifas" className="mb-5">
-              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {TABS.map((t) => (
-                  <button key={t.id} onClick={() => setFilter(t.id)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shrink-0 ${
-                      filter === t.id
-                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+            {/* ── Abas de categorias ── */}
+            <div id="rifas" className="mb-4">
+              <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory">
+                {tabs.map((tab) => (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shrink-0 snap-start ${
+                      activeTab === tab
+                        ? tab === "Destaques"
+                          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shadow-lg"
+                          : "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
                         : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
                     }`}>
-                    {t.icon} {t.label}
+                    {tab === "Destaques" && <Star size={11}/>}
+                    {tab}
+                    <span className="ml-0.5 text-[9px] opacity-60">
+                      ({activeTab === tab
+                        ? filtered.length
+                        : tab === "Todos"
+                          ? allRaffles.length
+                          : allRaffles.filter(r => (r as any).category === tab).length
+                      })
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* ── Lista de rifas ─────────────────────────────────── */}
+            {/* ── Lista de rifas da categoria ── */}
             {filtered.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock size={32} className="text-slate-700 mx-auto mb-3"/>
-                <p className="text-slate-500 font-medium text-sm">
-                  {filter === "encerrando"
-                    ? "Nenhum sorteio encerrando nos próximos 7 dias."
-                    : "Nenhuma rifa encontrada."}
-                </p>
+              <div className="text-center py-12 bg-slate-900 rounded-2xl border border-slate-800">
+                <Ticket size={32} className="text-slate-700 mx-auto mb-3"/>
+                <p className="text-slate-500 font-medium text-sm">Nenhuma rifa nesta categoria.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {filtered.map((raffle, idx) => {
-                  const img = raffle.images?.[0] ?? `https://picsum.photos/seed/${raffle.id}/600/300`;
-                  const pct = raffle.totalNumbers > 0 ? (raffle.soldNumbers.length/raffle.totalNumbers)*100 : 0;
+                  const img      = raffle.images?.[0] ?? `https://picsum.photos/seed/${raffle.id}/600/300`;
+                  const pct      = raffle.totalNumbers > 0 ? (raffle.soldNumbers.length/raffle.totalNumbers)*100 : 0;
                   const daysLeft = Math.ceil((tsToDate(raffle.drawDate).getTime()-now)/(1000*60*60*24));
-                  const isHot = pct > 70;
-                  const isNew = idx < 2 && filter === "todos";
+                  const isHot    = pct > 70;
 
                   return (
                     <motion.div key={raffle.id}
@@ -382,39 +388,44 @@ function PublicHome({ user }: { user: User | null }) {
                       className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden hover:border-indigo-500/40 transition-all"
                     >
                       {/* Imagem */}
-                      <Link to={`/raffle/${raffle.id}`} className="block relative h-48 sm:h-56 overflow-hidden">
+                      <Link to={`/raffle/${raffle.id}`} className="block relative h-44 sm:h-52 overflow-hidden">
                         <img src={img} alt={raffle.title}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                           referrerPolicy="no-referrer"/>
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent"/>
 
                         {/* Badges */}
-                        <div className="absolute top-4 left-4 flex gap-2">
-                          {isHot && (
-                            <span className="flex items-center gap-1 bg-orange-500/90 text-white text-[10px] font-black px-2.5 py-1 rounded-lg">
-                              <Flame size={11}/> QUENTE
+                        <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
+                          {(raffle as any).category && (raffle as any).category !== "Outros" && (
+                            <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg ${
+                              (raffle as any).category === "Destaques"
+                                ? "bg-yellow-500/90 text-white"
+                                : "bg-slate-950/80 text-slate-300 border border-slate-700"
+                            }`}>
+                              {(raffle as any).category === "Destaques" && <Star size={9}/>}
+                              {(raffle as any).category}
                             </span>
                           )}
-                          {isNew && (
-                            <span className="flex items-center gap-1 bg-indigo-600/90 text-white text-[10px] font-black px-2.5 py-1 rounded-lg">
-                              <Zap size={11}/> NOVO
+                          {isHot && (
+                            <span className="flex items-center gap-1 bg-orange-500/90 text-white text-[10px] font-black px-2 py-1 rounded-lg">
+                              <Flame size={10}/> QUENTE
                             </span>
                           )}
                           {daysLeft <= 3 && daysLeft > 0 && (
-                            <span className="flex items-center gap-1 bg-red-600/90 text-white text-[10px] font-black px-2.5 py-1 rounded-lg">
-                              <Clock size={11}/> {daysLeft}d restantes
+                            <span className="flex items-center gap-1 bg-red-600/90 text-white text-[10px] font-black px-2 py-1 rounded-lg">
+                              <Clock size={10}/> {daysLeft}d
                             </span>
                           )}
                         </div>
 
-                        <div className="absolute top-4 right-4 bg-indigo-600/90 backdrop-blur-sm px-3 py-1.5 rounded-xl shadow-xl">
-                          <p className="text-[9px] text-indigo-200 font-bold">Por apenas</p>
+                        <div className="absolute top-3 right-3 bg-indigo-600/90 px-2.5 py-1.5 rounded-xl">
+                          <p className="text-[9px] text-indigo-200 font-bold leading-none">Por apenas</p>
                           <p className="text-sm font-black text-white">R$ {raffle.pricePerNumber.toFixed(2)}</p>
                         </div>
 
-                        <div className="absolute bottom-4 left-4 right-4">
+                        <div className="absolute bottom-3 left-3 right-3">
                           {raffle.creatorName && (
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">
                               por {raffle.creatorName}
                             </p>
                           )}
@@ -422,15 +433,14 @@ function PublicHome({ user }: { user: User | null }) {
                         </div>
                       </Link>
 
-                      {/* Info + ação */}
-                      <div className="p-5 space-y-4">
-                        {/* Barra de progresso */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Progresso</span>
-                            <span className="text-white font-black">{pct.toFixed(0)}%</span>
+                      {/* Progresso + botão */}
+                      <div className="px-4 py-4 space-y-3">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center text-[10px] font-black tracking-widest uppercase">
+                            <span className="text-slate-500">Progresso</span>
+                            <span className="text-white">{pct.toFixed(0)}%</span>
                           </div>
-                          <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                             <motion.div
                               initial={{ width:0 }}
                               animate={{ width:`${pct}%` }}
@@ -438,25 +448,22 @@ function PublicHome({ user }: { user: User | null }) {
                               className={`h-full rounded-full ${pct > 70 ? "bg-gradient-to-r from-orange-500 to-red-500" : "bg-gradient-to-r from-indigo-600 to-indigo-400"}`}
                             />
                           </div>
-                          <div className="flex justify-between text-[10px] font-bold text-slate-600">
-                            <span>Total: {raffle.totalNumbers} cotas</span>
-                            <span className="flex items-center gap-1">
-                              <Calendar size={10}/>{tsToDate(raffle.drawDate).toLocaleDateString("pt-BR")}
-                            </span>
-                          </div>
+                          <p className="text-[10px] text-slate-600 font-bold">
+                            <Calendar size={9} className="inline mr-1"/>
+                            {tsToDate(raffle.drawDate).toLocaleDateString("pt-BR")}
+                          </p>
                         </div>
 
-                        {/* Botão comprar */}
                         <Link to={`/raffle/${raffle.id}`}
-                          className="flex items-center justify-between w-full bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-4 rounded-2xl font-black text-base shadow-xl shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]">
-                          <div className="flex items-center gap-3">
-                            <Ticket size={20}/>
+                          className="flex items-center justify-between w-full bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3.5 rounded-2xl font-black text-sm shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.01]">
+                          <div className="flex items-center gap-2">
+                            <Ticket size={18}/>
                             <div className="text-left">
-                              <p className="text-sm font-black leading-none">COMPRAR</p>
+                              <p className="text-sm font-black leading-none">PARTICIPAR</p>
                               <p className="text-[10px] text-emerald-200 font-bold">Garantir meus números</p>
                             </div>
                           </div>
-                          <ArrowRight size={20}/>
+                          <ArrowRight size={18}/>
                         </Link>
                       </div>
                     </motion.div>
@@ -464,52 +471,45 @@ function PublicHome({ user }: { user: User | null }) {
                 })}
               </div>
             )}
+
+            {/* Ganhadores */}
+            {winners.length > 0 && (
+              <div className="mt-10 space-y-4">
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <Trophy size={18} className="text-yellow-400"/> Ganhadores
+                </h2>
+                {winners.map((r) => (
+                  <Link key={r.id} to={`/raffle/${r.id}`}
+                    className="flex items-center gap-4 bg-slate-900 rounded-2xl border border-slate-800 p-4 hover:border-yellow-500/30 transition-all group">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-800 shrink-0">
+                      <img src={r.images?.[0]??`https://picsum.photos/seed/${r.id}/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Trophy size={12} className="text-yellow-400 shrink-0"/>
+                        <p className="text-sm font-black text-white line-clamp-1 group-hover:text-yellow-400 transition-colors">{r.winnerName}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 line-clamp-1">{r.title}</p>
+                    </div>
+                    <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/20 uppercase tracking-widest shrink-0">
+                      Concluído
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* CTA cadastro */}
+            {!user && (
+              <div className="mt-10 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-8 text-center space-y-5">
+                <h2 className="text-2xl font-black text-white">Quer criar seus próprios sorteios?</h2>
+                <p className="text-indigo-200 font-medium text-sm">Cadastre-se como criador e lance sua campanha em minutos.</p>
+                <Link to="/register" className="inline-flex items-center gap-3 bg-white text-indigo-700 px-8 py-4 rounded-2xl font-black text-base shadow-xl transition-all hover:scale-[1.02]">
+                  <PlusCircle size={20}/> Começar Agora — Grátis
+                </Link>
+              </div>
+            )}
           </>
-        )}
-
-        {/* ── Ganhadores ─────────────────────────────────────────── */}
-        {winners.length > 0 && (
-          <div className="mt-10 space-y-4">
-            <h2 className="text-xl font-black text-white">
-              🏆 Ganhadores{" "}
-              <span className="text-sm font-medium text-slate-500">Pessoas reais, prêmios reais.</span>
-            </h2>
-            {winners.map((r) => (
-              <Link key={r.id} to={`/raffle/${r.id}`}
-                className="flex items-center gap-4 bg-slate-900 rounded-2xl border border-slate-800 p-4 hover:border-yellow-500/30 transition-all group">
-                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-800 shrink-0">
-                  <img src={r.images?.[0]??`https://picsum.photos/seed/${r.id}/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer"/>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <Trophy size={12} className="text-yellow-400 shrink-0"/>
-                    <p className="text-sm font-black text-white line-clamp-1 group-hover:text-yellow-400 transition-colors">{r.winnerName}</p>
-                  </div>
-                  <p className="text-xs text-slate-500 line-clamp-1">{r.title}</p>
-                  <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest mt-0.5">
-                    #{String(r.winnerNumber).padStart(3,"0")} · {tsToDate(r.drawnAt).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-                <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/20 uppercase tracking-widest shrink-0">
-                  Concluído
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {/* ── CTA cadastro ───────────────────────────────────────── */}
-        {!user && (
-          <div className="mt-10 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-8 text-center space-y-5">
-            <h2 className="text-2xl font-black text-white">Quer criar seus próprios sorteios?</h2>
-            <p className="text-indigo-200 font-medium text-sm leading-relaxed">
-              Cadastre-se como criador e lance sua campanha em minutos.
-            </p>
-            <Link to="/register"
-              className="inline-flex items-center gap-3 bg-white text-indigo-700 px-8 py-4 rounded-2xl font-black text-base shadow-xl transition-all hover:scale-[1.02]">
-              <PlusCircle size={20}/> Começar Agora — Grátis
-            </Link>
-          </div>
         )}
       </div>
     </div>
