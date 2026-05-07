@@ -155,7 +155,7 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
         }),
       });
       const data = await res.json();
-      if (!data.qrCode) throw new Error(data.error ?? "Erro ao gerar PIX");
+      if (!data.qrCode) throw new Error(JSON.stringify(data.detail ?? data.error ?? "Erro desconhecido"));
       setPixQr({ qrCode: data.qrCode, qrBase64: data.qrBase64, paymentId: data.paymentId });
       setStep("pix");
 
@@ -172,7 +172,9 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
       }, 4000);
       setTimeout(() => clearInterval(poll), 30 * 60 * 1000);
     } catch (err) {
-      alert("Erro ao gerar PIX. Verifique a configuração do Mercado Pago.");
+      const msg = String(err).replace("Error: ","");
+      alert(`Erro PIX: ${msg.slice(0,200)}`);
+      console.error("PIX error:", err);
     } finally {
       setLoading(false);
     }
