@@ -242,6 +242,13 @@ export default function Dashboard({ user }: { user: User | null }) {
                         {raffle.status === "active" && (
                           <>
                             <Link
+                              to={`/edit-raffle/${raffle.id}`}
+                              className="p-2 text-slate-500 hover:text-amber-400 bg-slate-800 rounded-lg border border-slate-700 transition-all"
+                              title="Editar Rifa"
+                            >
+                              <Edit2 size={13} />
+                            </Link>
+                            <Link
                               to={`/draw/${raffle.id}`}
                               target="_blank"
                               className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800 rounded-lg border border-slate-700 transition-all"
