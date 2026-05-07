@@ -9,7 +9,7 @@ import {
   Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
   CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
   Copy, QrCode, RefreshCw, Users, FlaskConical, Trophy,
-  CreditCard, Loader2, Radio,
+  CreditCard, Loader2, Radio, Package, Star, Tag,
 } from "lucide-react";
 import { Raffle, User, Order } from "../types";
 import {
@@ -97,8 +97,12 @@ export default function RaffleDetail({ user }: Props) {
   const handleBuy = async () => {
     if (!currentUser) { navigate("/login"); return; }
     if (!raffle || selectedNumbers.length === 0) return;
+    const minQty = (raffle as any).minQuantity ?? 1;
+    if (selectedNumbers.length < minQty) {
+      alert(`Esta rifa requer no mínimo ${minQty} cota(s) por compra. Você selecionou ${selectedNumbers.length}.`);
+      return;
+    }
     if (!currentUser.profileComplete) { setShowProfileModal(true); return; }
-    // Rifas reais usam o PaymentModal com Checkout Bricks
     if (!raffle.isTest) { setShowPaymentModal(true); return; }
     setModal("choose"); // simulação
   };
@@ -447,33 +451,76 @@ export default function RaffleDetail({ user }: Props) {
             </div>
 
             {raffle.status === "active" && (
-              <div className="flex items-center gap-3 mb-5 p-3 bg-slate-950 rounded-xl border border-slate-800 flex-wrap">
-                <Zap size={15} className="text-indigo-400 shrink-0" />
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                  Compra Rápida:
-                </span>
-                <select
-                  value={quickQty}
-                  onChange={(e) => setQuickQty(Number(e.target.value))}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white outline-none"
-                >
-                  {[1, 5, 10, 25, 50, 100].map((n) => (
-                    <option key={n} value={n}>{n} {n === 1 ? "cota" : "cotas"}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={quickPick}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-black transition-all"
-                >
-                  Sortear!
-                </button>
-                {selectedNumbers.length > 0 && (
-                  <button
-                    onClick={() => setSelectedNumbers([])}
-                    className="ml-auto text-slate-500 hover:text-red-400 transition-colors text-xs font-bold"
-                  >
-                    Limpar
+              <div className="mb-5 space-y-4">
+                {/* Pacotes — se existirem */}
+                {(raffle as any).packages?.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Escolha um pacote:</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {((raffle as any).packages as { id:string; label:string; quantity:number; price:number; discount?:number; highlight?:boolean }[]).map((pkg) => {
+                        const normalPrice = pkg.quantity * raffle.pricePerNumber;
+                        const sel = selectedNumbers.length === pkg.quantity;
+                        return (
+                          <button key={pkg.id} type="button"
+                            onClick={() => {
+                              const available = Array.from({length: raffle.totalNumbers}, (_,i) => i+1)
+                                .filter(n => !raffle.soldNumbers.includes(n));
+                              const shuffled = available.sort(() => Math.random()-0.5);
+                              setSelectedNumbers(shuffled.slice(0, pkg.quantity));
+                            }}
+                            className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                              sel
+                                ? pkg.highlight ? "bg-indigo-600 border-indigo-400" : "bg-slate-700 border-slate-500"
+                                : pkg.highlight ? "bg-indigo-500/10 border-indigo-500/40 hover:bg-indigo-500/20" : "bg-slate-950 border-slate-800 hover:border-slate-600"
+                            }`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${pkg.highlight ? "bg-indigo-600/30 text-indigo-300" : "bg-slate-800 text-slate-400"}`}>
+                                <Package size={18}/>
+                              </div>
+                              <div className="text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-white text-sm">{pkg.label}</span>
+                                  {pkg.highlight && <span className="text-[9px] font-black text-indigo-300 bg-indigo-500/20 px-1.5 py-0.5 rounded border border-indigo-500/20 uppercase">⭐ Popular</span>}
+                                </div>
+                                <p className="text-xs text-slate-400">{pkg.quantity} cotas aleatórias</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              {pkg.discount > 0 && <p className="text-[10px] line-through text-slate-600">R$ {normalPrice.toFixed(2)}</p>}
+                              <p className={`text-base font-black ${pkg.highlight ? "text-indigo-200" : "text-white"}`}>R$ {pkg.price.toFixed(2)}</p>
+                              {pkg.discount > 0 && <span className="text-[9px] font-black text-emerald-400">-{pkg.discount}%</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-slate-600 text-center">ou selecione cotas individuais abaixo</p>
+                  </div>
+                )}
+
+                {/* Compra rápida */}
+                <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800 flex-wrap">
+                  <Zap size={15} className="text-indigo-400 shrink-0"/>
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Compra Rápida:</span>
+                  <select value={quickQty} onChange={e => setQuickQty(Number(e.target.value))}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-white outline-none">
+                    {[1,5,10,25,50,100]
+                      .filter(n => n >= ((raffle as any).minQuantity ?? 1))
+                      .map(n => <option key={n} value={n}>{n} {n===1?"cota":"cotas"}</option>)}
+                  </select>
+                  <button onClick={quickPick} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-black transition-all">
+                    Sortear!
                   </button>
+                  {selectedNumbers.length > 0 && (
+                    <button onClick={() => setSelectedNumbers([])} className="ml-auto text-slate-500 hover:text-red-400 transition-colors text-xs font-bold">
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                {(raffle as any).minQuantity > 1 && (
+                  <p className="text-[10px] text-amber-400 font-bold flex items-center gap-1.5">
+                    ⚠️ Mínimo de {(raffle as any).minQuantity} cotas por compra
+                  </p>
                 )}
               </div>
             )}
