@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import CompleteProfileModal from "../components/CompleteProfileModal";
+import PaymentModal from "../components/PaymentModal";
 import {
   Ticket, Calendar, ShieldCheck, Share2, ShoppingCart,
   CheckCircle2, Wallet, X, Sparkles, ArrowLeft, Zap,
@@ -28,6 +29,7 @@ export default function RaffleDetail({ user }: Props) {
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(user);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string; qrBase64: string; paymentId: number } | null>(null);
   const [pixStatus, setPixStatus] = useState<"pending"|"approved"|"error">("pending");
   const [payMethod, setPayMethod] = useState<"pix"|"card">("pix");
@@ -92,12 +94,10 @@ export default function RaffleDetail({ user }: Props) {
   const handleBuy = async () => {
     if (!currentUser) { navigate("/login"); return; }
     if (!raffle || selectedNumbers.length === 0) return;
-    // Verifica se perfil está completo (CPF + telefone)
-    if (!currentUser.profileComplete) {
-      setShowProfileModal(true);
-      return;
-    }
-    setModal("choose");
+    if (!currentUser.profileComplete) { setShowProfileModal(true); return; }
+    // Rifas reais usam o PaymentModal com Checkout Bricks
+    if (!raffle.isTest) { setShowPaymentModal(true); return; }
+    setModal("choose"); // simulação
   };
 
   // ── Simulação (rifas de teste) ────────────────────────────────────────────
@@ -592,6 +592,30 @@ export default function RaffleDetail({ user }: Props) {
           </motion.div>
         </div>
       </div>
+
+      {/* ── Payment Modal (rifas reais) ── */}
+      {showPaymentModal && raffle && currentUser && (
+        <PaymentModal
+          raffleId={raffle.id}
+          raffleTitle={raffle.title}
+          amount={selectedNumbers.length * raffle.pricePerNumber}
+          qtd={selectedNumbers.length}
+          user={currentUser}
+          selectedNumbers={selectedNumbers}
+          onSuccess={async () => {
+            setShowPaymentModal(false);
+            setSelectedNumbers([]);
+            setModal("success");
+            // Atualiza soldNumbers
+            if (raffle) {
+              const updated = await import("../lib/firebaseService").then(m => m.getRaffle(raffle.id));
+              if (updated) setRaffle(updated);
+            }
+          }}
+          onClose={() => setShowPaymentModal(false)}
+          selectedNumbers={selectedNumbers}
+        />
+      )}
 
       {/* ── Complete Profile Modal ────────────────────────────────────── */}
       {showProfileModal && currentUser && (
