@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LogOut, PlusCircle, LayoutDashboard, Ticket, Menu, X, Shield, ShoppingBag } from "lucide-react";
+import { LogOut, PlusCircle, LayoutDashboard, Ticket, Menu, X, Shield, ShoppingBag, BarChart3 } from "lucide-react";
 import { User } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -32,7 +32,10 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             {user ? (
               <div className="flex items-center space-x-4">
                 {isAdmin && (
+                  <>
                   <NavLink to="/admin" label="Admin" icon={<Shield size={14} className="text-amber-400" />} active={pathname === "/admin"} />
+                  <NavLink to="/reports" label="Relatórios" icon={<BarChart3 size={14} className="text-emerald-400" />} active={pathname === "/reports"} />
+                  </>
                 )}
                 {isCreatorOrAdmin && (
                   <>
@@ -41,6 +44,7 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                       <span>Criar Sorteio</span>
                     </Link>
                     <NavLink to="/dashboard" label="Dashboard" icon={<LayoutDashboard size={14} />} active={pathname === "/dashboard"} />
+                    <NavLink to="/my-reports" label="Relatórios" icon={<BarChart3 size={14} className="text-emerald-400"/>} active={pathname === "/my-reports"} />
                   </>
                 )}
                 <NavLink to="/my-orders" label="Meus Pedidos" icon={<ShoppingBag size={14} />} active={pathname === "/my-orders"} />
@@ -86,10 +90,12 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
               {user ? (
                 <>
                   {isAdmin && <MobileLink to="/admin" label="Painel Admin" icon={<Shield size={17} className="text-amber-400" />} onClick={close} />}
+                  {isAdmin && <MobileLink to="/reports" label="Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />}
                   {isCreatorOrAdmin && (
                     <>
                       <MobileLink to="/create-raffle" label="Criar Nova Rifa" icon={<PlusCircle size={17} className="text-indigo-400" />} onClick={close} />
                       <MobileLink to="/dashboard" label="Dashboard" icon={<LayoutDashboard size={17} />} onClick={close} />
+                      <MobileLink to="/my-reports" label="Meus Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />
                     </>
                   )}
                   <MobileLink to="/my-orders" label="Meus Pedidos" icon={<ShoppingBag size={17} className="text-indigo-400" />} onClick={close} />
