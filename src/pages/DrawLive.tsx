@@ -106,6 +106,7 @@ export default function DrawLive() {
         soldNumbers={raffle.soldNumbers.length > 0 ? raffle.soldNumbers : [raffle.winnerNumber]}
         winnerNumber={raffle.winnerNumber}
         winnerName={raffle.winnerName ?? "Ganhador"}
+        totalNumbers={raffle.totalNumbers}
         onComplete={() => setTriggerAnimation(false)}
       />
     );
@@ -136,16 +137,21 @@ export function DrawAnimation({
   winnerNumber,
   winnerName,
   onComplete,
+  totalNumbers,
 }: {
   soldNumbers: number[];
   winnerNumber: number;
   winnerName: string;
   onComplete?: () => void;
+  totalNumbers?: number;
 }) {
   type Phase = "intro" | "spinning" | "slowing" | "reveal" | "done";
+  // Máximo para giro visual — usa totalNumbers se disponível
+  const maxNum = totalNumbers ?? Math.max(...soldNumbers, 100);
+
   const [phase,      setPhase]      = useState<Phase>("intro");
   const [phraseIdx,  setPhraseIdx]  = useState(0);
-  const [displayNum, setDisplayNum] = useState(soldNumbers[0] ?? 1);
+  const [displayNum, setDisplayNum] = useState(Math.floor(Math.random() * maxNum) + 1);
   const [confetti,   setConfetti]   = useState<{ id: number; x: number; color: string; size: number }[]>([]);
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinStarted = useRef(false);
@@ -175,11 +181,11 @@ export function DrawAnimation({
 
     let speed = 60;
     let elapsed = 0;
-    const total = 4500;
+    const total = 10000; // 10 segundos de giro
 
     const tick = () => {
       elapsed += speed;
-      setDisplayNum(soldNumbers[Math.floor(Math.random() * soldNumbers.length)]);
+      setDisplayNum(Math.floor(Math.random() * maxNum) + 1);
 
       if (elapsed > total * 0.55 && speed < 130) {
         speed = 130;
@@ -529,6 +535,7 @@ function ResultView({ raffle, orders }: { raffle: Raffle; orders: Order[] }) {
         soldNumbers={raffle.soldNumbers.length > 0 ? raffle.soldNumbers : [raffle.winnerNumber!]}
         winnerNumber={raffle.winnerNumber!}
         winnerName={raffle.winnerName!}
+        totalNumbers={raffle.totalNumbers}
         onComplete={() => setShowAnim(false)}
       />
     );
