@@ -48,27 +48,18 @@ export default function DrawLive() {
 
       if (scheduledStr && scheduledStr !== prevScheduled.current && data.status === "active") {
         prevScheduled.current = scheduledStr;
+        // Calcula segundos restantes baseado no timestamp do Firestore
         if (countIntervalRef.current) clearInterval(countIntervalRef.current);
-
-        // Calcula quanto tempo JÁ passou desde que o criador iniciou — sincroniza com todos
-        const scheduledMs = data.drawScheduledAt instanceof Object && "toMillis" in data.drawScheduledAt
-          ? (data.drawScheduledAt as { toMillis: () => number }).toMillis()
-          : Date.now();
-        
-        const getRemaining = () => Math.max(0, 60 - Math.floor((Date.now() - scheduledMs) / 1000));
-        
-        const initial = getRemaining();
-        if (initial <= 0) { setCountdown(null); return; }
-        setCountdown(initial);
-
+        let secs = 60;
+        setCountdown(secs);
         countIntervalRef.current = setInterval(() => {
-          const rem = getRemaining();
-          setCountdown(rem);
-          if (rem <= 0) {
+          secs -= 1;
+          setCountdown(secs);
+          if (secs <= 0) {
             if (countIntervalRef.current) clearInterval(countIntervalRef.current);
             setCountdown(null);
           }
-        }, 500); // atualiza a cada 500ms para maior precisão
+        }, 1000);
       }
 
       // Detecta transição active → finished e dispara animação
@@ -87,7 +78,7 @@ export default function DrawLive() {
       setLoading(false);
     });
     return () => { unsub(); if (countIntervalRef.current) clearInterval(countIntervalRef.current); };
-  }, [id]);
+
 
   if (loading)
     return (
@@ -165,36 +156,45 @@ export function DrawAnimation({
     return () => clearInterval(t);
   }, [phase]);
 
-  // Fase 2: números girando
+  // Fase 2: números girando — ref previne re-execução quando muda para "slowing"
+  const spinStarted = useRef(false);
   useEffect(() => {
-    if (phase !== "spinning") return;
+    if (phase !== "spinning" || spinStarted.current) return;
+    spinStarted.current = true;
+
     let speed = 60;
     let elapsed = 0;
     const total = 4500;
 
-    intervalRef.current = setInterval(() => {
-      setDisplayNum(soldNumbers[Math.floor(Math.random() * soldNumbers.length)]);
+    const tick = () => {
       elapsed += speed;
+      setDisplayNum(soldNumbers[Math.floor(Math.random() * soldNumbers.length)]);
 
-      if (elapsed > total * 0.55) { speed = 130; setPhase("slowing"); }
-      if (elapsed > total * 0.82) speed = 320;
+      if (elapsed > total * 0.55 && speed === 60) { speed = 130; setPhase("slowing"); }
+      if (elapsed > total * 0.82 && speed === 130) { speed = 320; }
 
       if (elapsed >= total) {
-        if (intervalRef.current) clearInterval(intervalRef.current);
+        clearTimeout(nextTick);
         setDisplayNum(winnerNumber);
         setPhase("reveal");
         setConfetti(Array.from({ length: 80 }, (_, i) => ({
-          id: i,
-          x: Math.random() * 100,
+          id: i, x: Math.random() * 100,
           color: COLORS[Math.floor(Math.random() * COLORS.length)],
           size: 8 + Math.random() * 10,
         })));
         setTimeout(() => { setPhase("done"); onComplete?.(); }, 4000);
+        return;
       }
-    }, speed);
 
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [phase === "spinning"]);
+      nextTick = setTimeout(tick, speed) as unknown as ReturnType<typeof setTimeout>;
+      intervalRef.current = nextTick;
+    };
+
+    let nextTick = setTimeout(tick, speed) as unknown as ReturnType<typeof setTimeout>;
+    intervalRef.current = nextTick;
+
+    return () => { clearTimeout(nextTick); };
+  }, [phase]);
 
   return (
     <div className="fixed inset-0 z-[500] bg-slate-950 flex flex-col items-center justify-center px-4 overflow-hidden">
@@ -357,38 +357,33 @@ function CountdownView({ raffle, seconds }: { raffle: Raffle; seconds: number })
           <h1 className="text-2xl font-black text-white mt-3">{raffle.title}</h1>
         </div>
 
-        {/* Contador grande — círculo com número centralizado, sem sobreposição */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center">
-            {/* SVG ocupa o espaço exato do container */}
-            <svg
-              viewBox="0 0 220 220"
-              className="absolute inset-0 w-full h-full -rotate-90"
+        {/* Contador grande */}
+        <div className="relative flex items-center justify-center">
+          {/* Círculo animado */}
+          <svg width="220" height="220" className="absolute">
+            <circle cx="110" cy="110" r="100" fill="none" stroke="#1e1e2e" strokeWidth="10" />
+            <motion.circle
+              cx="110" cy="110" r="100"
+              fill="none"
+              stroke="#6366f1"
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 100}`}
+              strokeDashoffset={`${2 * Math.PI * 100 * (1 - pct / 100)}`}
+              transform="rotate(-90 110 110)"
+              transition={{ duration: 0.9 }}
+            />
+          </svg>
+          <div className="text-center z-10">
+            <motion.p
+              key={seconds}
+              initial={{ scale: 1.2, opacity: 0.7 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-7xl font-black text-white leading-none tabular-nums"
             >
-              <circle cx="110" cy="110" r="96" fill="none" stroke="#1e1e2e" strokeWidth="12" />
-              <motion.circle
-                cx="110" cy="110" r="96"
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 96}`}
-                animate={{ strokeDashoffset: 2 * Math.PI * 96 * (1 - pct / 100) }}
-                transition={{ duration: 0.8 }}
-              />
-            </svg>
-            {/* Número sobre o círculo */}
-            <div className="relative z-10 text-center">
-              <motion.p
-                key={seconds}
-                initial={{ scale: 1.15, opacity: 0.6 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="text-5xl sm:text-6xl font-black text-white leading-none tabular-nums"
-              >
-                {String(seconds).padStart(2,"0")}
-              </motion.p>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">seg</p>
-            </div>
+              {String(seconds).padStart(2, "0")}
+            </motion.p>
+            <p className="text-slate-500 text-xs font-black uppercase tracking-widest mt-1">segundos</p>
           </div>
         </div>
 
