@@ -25,6 +25,15 @@ import { User, Raffle, Order, DashboardRaffle } from "../types";
 
 export type { DashboardRaffle } from "../types";
 
+
+/** Gera código único para a rifa: AZ-ANO-XXXX */
+const generateRaffleCode = (): string => {
+  const year = new Date().getFullYear();
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const rand = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `AZ-${year}-${rand}`;
+};
+
 const ADMIN_EMAIL = "ggrifasadm@gmail.com";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -112,7 +121,7 @@ export const getRaffles = async (): Promise<Raffle[]> => {
   const snap = await getDocs(collection(db, "raffles"));
   return snap.docs
     .map((d) => ({ ...d.data(), id: d.id } as Raffle))
-    .filter((r) => r.status === "active" || r.status === "finished")
+    .filter((r) => !r.deleted && (r.status === "active" || r.status === "finished"))
     .sort(
       (a, b) =>
         tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
@@ -131,6 +140,8 @@ export const createRaffle = async (
     ...data,
     soldNumbers: [],
     status: "active",
+    raffleCode: generateRaffleCode(),
+    deleted: false,
     createdAt: serverTimestamp(),
   });
   return ref.id;
@@ -141,6 +152,12 @@ export const updateRaffle = async (id: string, data: Partial<Raffle>) => {
 };
 
 export const deleteRaffle = async (id: string) => {
+  // Soft delete — mantém no banco para histórico do admin
+  await updateDoc(doc(db, "raffles", id), { deleted: true });
+};
+
+/** Hard delete — apenas para uso interno */
+export const hardDeleteRaffle = async (id: string) => {
   await deleteDoc(doc(db, "raffles", id));
 };
 
@@ -273,6 +290,7 @@ export const getCreatorDashboard = async (
   const raffleSnap = await getDocs(q);
   const raffles = raffleSnap.docs
     .map((d) => ({ ...d.data(), id: d.id } as Raffle))
+    .filter((r) => !r.deleted)
     .sort(
       (a, b) =>
         tsToDate(b.createdAt).getTime() - tsToDate(a.createdAt).getTime()
