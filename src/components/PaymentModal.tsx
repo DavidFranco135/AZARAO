@@ -105,11 +105,12 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
             });
             const data = await res.json();
             if (data.status === "approved") {
-              // Garante reserva das cotas
-              const { confirmOrderAndReserve } = await import("../lib/firebaseService");
-              await confirmOrderAndReserve(oid, raffleId, selectedNumbers, String(data.paymentId));
+              try {
+                const { confirmOrderAndReserve } = await import("../lib/firebaseService");
+                await confirmOrderAndReserve(oid, raffleId, selectedNumbers, String(data.paymentId));
+              } catch(e) { console.error("Confirm error:", e); }
               setStep("success");
-              setTimeout(onSuccess, 2000);
+              setTimeout(() => onSuccess(orderId, selectedNumbers, amount, "paid"), 1500);
             } else if (data.status === "in_process") {
               alert("Pagamento em análise. Aguarde a confirmação.");
               onClose();
@@ -167,19 +168,24 @@ export default function PaymentModal({ raffleId, raffleTitle, amount, qtd, user,
       setStep("pix");
 
       // Polling para confirmar pagamento
+      const confirmAndFinish = async (paymentId: string) => {
+        try {
+          const { confirmOrderAndReserve } = await import("../lib/firebaseService");
+          await confirmOrderAndReserve(oid, raffleId, selectedNumbers, paymentId);
+        } catch (e) { console.error("Confirm error:", e); }
+        setStep("success");
+        setTimeout(() => onSuccess(orderId, selectedNumbers, amount, "paid"), 1500);
+      };
+
       const poll = setInterval(async () => {
         try {
           const s = await fetch(`/api/mp-payment-status?id=${data.paymentId}`).then(r => r.json());
           if (s.status === "approved") {
             clearInterval(poll);
-            // Garante que as cotas sejam reservadas mesmo se o webhook demorar
-            const { confirmOrderAndReserve } = await import("../lib/firebaseService");
-            await confirmOrderAndReserve(oid, raffleId, selectedNumbers, String(data.paymentId));
-            setStep("success");
-            setTimeout(onSuccess, 2000);
+            await confirmAndFinish(String(data.paymentId));
           }
         } catch { /* ignora */ }
-      }, 4000);
+      }, 3000);
       setTimeout(() => clearInterval(poll), 30 * 60 * 1000);
     } catch (err) {
       // Se já criou o pedido, cancela e libera os números
