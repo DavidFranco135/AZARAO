@@ -13,6 +13,7 @@ import {
   getRaffle, getRaffleOrders, performDraw, scheduleDrawCountdown, tsToDate,
 } from "../lib/firebaseService";
 import { DrawAnimation } from "./DrawLive";
+import { Edit2 } from "lucide-react";
 
 export default function RaffleManage({ user }: { user: User | null }) {
   const { id } = useParams<{ id: string }>();
@@ -150,6 +151,10 @@ export default function RaffleManage({ user }: { user: User | null }) {
                   #{(raffle as any).raffleCode}
                 </span>
               )}
+            <Link to={`/edit-raffle/${raffle.id}`}
+              className="flex items-center gap-2 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-xl text-xs font-bold border border-slate-700 transition-all">
+              <Edit2 size={13}/> Editar Rifa
+            </Link>
             </div>
             <div className="flex items-center gap-3 mt-2 text-slate-400 text-sm">
               <Calendar size={14} className="text-indigo-400" />
