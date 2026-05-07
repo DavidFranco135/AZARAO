@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 import { User } from "../types";
-import { updateUserProfile, tsToDate } from "../lib/firebaseService";
+import { tsToDate, resetPassword } from "../lib/firebaseService";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -262,8 +262,7 @@ export default function AdminUserEditModal({ user, onClose, onSaved, onDeleted }
 
                 {/* Redefinir senha (via e-mail) */}
                 <button onClick={async () => {
-                    const { resetPassword } = await import("../lib/firebaseService");
-                    await resetPassword(user.email);
+                                await resetPassword(user.email);
                     alert(`E-mail de redefinição enviado para ${user.email}`);
                   }}
                   className="w-full flex items-center gap-3 p-5 bg-slate-950 border border-slate-800 rounded-2xl hover:border-slate-600 transition-all">
