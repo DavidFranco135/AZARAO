@@ -583,25 +583,69 @@ export default function RaffleDetail({ user }: Props) {
                   </div>
 
                   {raffle.isTest ? (
-                    <button
-                      onClick={handleSimPayment}
-                      className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3"
-                    >
-                      <FlaskConical size={22} />
-                      SIMULAR PAGAMENTO
-                    </button>
-                  ) : (
+                    /* ── MODO TESTE ── */
                     <div className="space-y-3">
+                      <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5">
+                        <FlaskConical size={15} className="text-amber-400 shrink-0" />
+                        <p className="text-xs text-amber-300 font-medium">Rifa de simulação — nenhum valor real será cobrado</p>
+                      </div>
+                      <button
+                        onClick={handleSimPayment}
+                        className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3"
+                      >
+                        <FlaskConical size={22} />
+                        SIMULAR PAGAMENTO (TESTE)
+                      </button>
+                    </div>
+                  ) : (
+                    /* ── PAGAMENTO REAL — MERCADO PAGO ── */
+                    <div className="space-y-4">
+                      {/* Card resumo */}
+                      <div className="bg-slate-950 rounded-2xl border border-slate-800 divide-y divide-slate-800">
+                        <div className="flex justify-between items-center px-5 py-3">
+                          <span className="text-xs font-bold text-slate-500">Cotas selecionadas</span>
+                          <span className="text-sm font-black text-white">{selectedNumbers.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-5 py-3">
+                          <span className="text-xs font-bold text-slate-500">Valor por cota</span>
+                          <span className="text-sm font-black text-white">R$ {raffle.pricePerNumber.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center px-5 py-3">
+                          <span className="text-xs font-bold text-slate-500">Total</span>
+                          <span className="text-lg font-black text-emerald-400">R$ {totalSelected.toLocaleString("pt-BR",{minimumFractionDigits:2})}</span>
+                        </div>
+                      </div>
+
+                      {/* Botão MP */}
                       <button
                         onClick={handleMpPayment}
                         disabled={mpLoading}
-                        className="w-full bg-[#00b1ea] hover:bg-[#009fd4] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        className="w-full bg-[#009ee3] hover:bg-[#0088c7] text-white py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl shadow-[#009ee3]/20"
                       >
-                        {mpLoading ? <Loader2 size={22} className="animate-spin" /> : <CreditCard size={22} />}
-                        PAGAR COM MERCADO PAGO
+                        {mpLoading
+                          ? <><Loader2 size={22} className="animate-spin" /> Preparando pagamento...</>
+                          : <><CreditCard size={22} /> PAGAR COM MERCADO PAGO</>
+                        }
                       </button>
-                      <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                        PIX · Cartão · Boleto — Split automático
+
+                      {/* Métodos aceitos */}
+                      <div className="flex items-center justify-center gap-4 py-1">
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <div className="w-6 h-4 bg-slate-700 rounded text-[8px] flex items-center justify-center font-black text-white">PIX</div>
+                          <span className="text-[10px] font-bold">PIX</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <CreditCard size={14} />
+                          <span className="text-[10px] font-bold">Cartão</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <div className="w-5 h-4 bg-slate-700 rounded text-[7px] flex items-center justify-center font-black text-white">BOL</div>
+                          <span className="text-[10px] font-bold">Boleto</span>
+                        </div>
+                      </div>
+
+                      <p className="text-center text-[10px] text-slate-600 font-bold">
+                        🔒 Pagamento 100% seguro processado pelo Mercado Pago
                       </p>
                     </div>
                   )}
