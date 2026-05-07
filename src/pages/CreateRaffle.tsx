@@ -23,6 +23,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
   const [qty,         setQty]         = useState("100");// string do <select>
   const [drawDate,    setDrawDate]    = useState("");
   const [imageUrl,    setImageUrl]    = useState("");
+  const [images,      setImages]      = useState<string[]>([]);
   const [imgMode,     setImgMode]     = useState<"upload"|"url">("upload");
   const [preview,     setPreview]     = useState<string|null>(null);
   const [uploading,   setUploading]   = useState(false);
@@ -84,7 +85,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
         pricePerNumber: precoNum,
         totalNumbers: qtdNum,
         drawDate,
-        images: imageUrl ? [imageUrl] : [],
+        images: images.length > 0 ? images : imageUrl ? [imageUrl] : [],
         creatorId: user.id, creatorName: user.name,
         commissionPercentage: taxaPlat,
         isTest,
@@ -214,7 +215,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
                             const remaining = 8 - images.length;
                             setPreview(files[0] ? URL.createObjectURL(files[0]) : null);
                             for (const file of files.slice(0, remaining)) {
-                              const url = await (await import("../lib/imgbb")).uploadToImgBB(file);
+                              const url = await uploadImageToImgBB(file);
                               if (url) setImages((prev: string[]) => [...prev, url]);
                             }
                             setPreview(null);
