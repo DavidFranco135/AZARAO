@@ -5,10 +5,11 @@ import {
   Save, ArrowLeft, Loader2, Image as ImageIcon,
   Upload, X, DollarSign, Calendar, Hash,
   FlaskConical, CheckCircle2, Ticket, LinkIcon,
-  AlertTriangle,
+  AlertTriangle, Tag,
 } from "lucide-react";
 import { User, Raffle } from "../types";
 import { getRaffle, updateRaffle } from "../lib/firebaseService";
+import CategorySelector from "../components/CategorySelector";
 import { uploadImageToImgBB } from "../lib/imgbb";
 
 interface Props { user: User | null }
@@ -35,6 +36,7 @@ export default function EditRaffle({ user }: Props) {
   const [pricePerNum, setPricePerNum] = useState("");
   const [images,      setImages]      = useState<string[]>([]);
   const [isTest,      setIsTest]      = useState(false);
+  const [category,    setCategory]    = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -51,6 +53,7 @@ export default function EditRaffle({ user }: Props) {
       setPricePerNum(String(r.pricePerNumber ?? ""));
       setImages(r.images?.filter(Boolean) ?? []);
       setIsTest(r.isTest ?? false);
+      setCategory((r as any).category ?? "");
       setLoading(false);
     });
   }, [id]);
@@ -92,6 +95,7 @@ export default function EditRaffle({ user }: Props) {
         pricePerNumber: price,
         images,
         isTest,
+        category: category || "Outros",
       });
       setSaved(true);
       setTimeout(() => { setSaved(false); navigate(`/dashboard/raffle/${id}`); }, 1500);
@@ -185,6 +189,11 @@ export default function EditRaffle({ user }: Props) {
               <input type="date" value={drawDate} onChange={e => setDrawDate(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
                 className={INPUT}/>
+            </Field>
+
+            {/* Categoria */}
+            <Field icon={<Tag size={15}/>} label="Categoria">
+              <CategorySelector value={category} onChange={setCategory}/>
             </Field>
 
             {/* Modo */}
