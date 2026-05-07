@@ -173,53 +173,76 @@ export default function CreateRaffle({ user }: { user: User | null }) {
                 />
               </FieldWrap>
 
-              <FieldWrap label="Imagem do Prêmio">
-                {/* toggle */}
-                <div className="flex p-1 bg-slate-950 rounded-xl border border-slate-800 mb-3">
-                  {(["upload","url"] as const).map((m) => (
-                    <button key={m} type="button" onClick={() => setImgMode(m)}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${imgMode===m?"bg-indigo-600 text-white":"text-slate-500 hover:text-slate-300"}`}>
-                      {m==="upload"?<><Upload size={12}/>Dispositivo</>:<><LinkIcon size={12}/>URL</>}
-                    </button>
-                  ))}
-                </div>
-                {imgMode==="upload" ? (
-                  preview ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-700">
-                      <img src={preview} alt="" className="w-full h-40 object-cover"/>
-                      {uploading && (
-                        <div className="absolute inset-0 bg-slate-950/70 flex items-center justify-center gap-2 text-white text-sm font-bold">
-                          <Loader2 size={18} className="animate-spin"/>Enviando...
-                        </div>
-                      )}
-                      {!uploading && (
-                        <button type="button" onClick={()=>{setPreview(null);setImageUrl("");if(fileRef.current)fileRef.current.value="";}}
-                          className="absolute top-2 right-2 bg-slate-900/80 p-1.5 rounded-lg text-white hover:bg-red-600 transition-colors">
-                          <X size={14}/>
+              <FieldWrap label={`Fotos do Prêmio (${images.length}/8)`}>
+                {/* Grid de fotos adicionadas */}
+                {images.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {images.map((img, i) => (
+                      <div key={i} className={`relative rounded-xl overflow-hidden group ${i===0?"col-span-2 row-span-2":""}`}
+                        style={{ aspectRatio: "1" }}>
+                        <img src={img} alt={`Foto ${i+1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer"/>
+                        {i === 0 && (
+                          <div className="absolute top-1 left-1 bg-indigo-600/90 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">Capa</div>
+                        )}
+                        <button type="button"
+                          onClick={() => setImages((prev: string[]) => prev.filter((_: string, idx: number) => idx !== i))}
+                          className="absolute top-1 right-1 w-6 h-6 bg-slate-950/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all">
+                          <X size={11}/>
                         </button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" id="img-up"/>
-                      <label htmlFor="img-up" className="flex flex-col items-center justify-center gap-3 h-36 border-2 border-dashed border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all">
-                        <ImageIcon size={26} className="text-slate-600"/>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-400">Clique para escolher</p>
-                          <p className="text-xs text-slate-600">JPG, PNG ou WEBP — máx. 32MB</p>
-                        </div>
-                      </label>
-                    </>
-                  )
-                ) : (
-                  <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className={INPUT}
-                  />
+                      </div>
+                    ))}
+                  </div>
                 )}
+
+                {images.length < 8 && (
+                  <>
+                    {/* toggle */}
+                    <div className="flex p-1 bg-slate-950 rounded-xl border border-slate-800 mb-3">
+                      {(["upload","url"] as const).map((m) => (
+                        <button key={m} type="button" onClick={() => setImgMode(m)}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${imgMode===m?"bg-indigo-600 text-white":"text-slate-500 hover:text-slate-300"}`}>
+                          {m==="upload"?<><Upload size={12}/>Dispositivo</>:<><LinkIcon size={12}/>URL</>}
+                        </button>
+                      ))}
+                    </div>
+
+                    {imgMode==="upload" ? (
+                      <>
+                        <input ref={fileRef} type="file" accept="image/*" multiple
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files ?? []);
+                            const remaining = 8 - images.length;
+                            setPreview(files[0] ? URL.createObjectURL(files[0]) : null);
+                            for (const file of files.slice(0, remaining)) {
+                              const url = await (await import("../lib/imgbb")).uploadToImgBB(file);
+                              if (url) setImages((prev: string[]) => [...prev, url]);
+                            }
+                            setPreview(null);
+                          }}
+                          className="hidden" id="img-up"/>
+                        <label htmlFor="img-up" className="flex flex-col items-center justify-center gap-3 h-28 border-2 border-dashed border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all">
+                          {uploading
+                            ? <><Loader2 size={20} className="text-indigo-400 animate-spin"/><p className="text-xs text-slate-400 font-bold">Enviando...</p></>
+                            : <><ImageIcon size={22} className="text-slate-600"/><p className="text-sm font-bold text-slate-400">Clique para adicionar fotos</p><p className="text-xs text-slate-600">Selecione várias de uma vez</p></>
+                          }
+                        </label>
+                      </>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input type="url" placeholder="https://..." className={INPUT + " flex-1"}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const url = (e.target as HTMLInputElement).value.trim();
+                              if (url.startsWith("http")) { setImages((prev: string[]) => [...prev, url]); (e.target as HTMLInputElement).value = ""; }
+                            }
+                          }}
+                        />
+                        <span className="text-xs text-slate-600 self-center whitespace-nowrap">↵ Enter</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <p className="text-[10px] text-slate-600 mt-1">A primeira foto é a capa. Arraste na galeria para reordenar.</p>
               </FieldWrap>
             </div>
 
