@@ -9,6 +9,15 @@ export interface User {
   profileComplete?: boolean; // true quando phone e cpf estão preenchidos
 }
 
+export interface RafflePackage {
+  id:          string;
+  label:       string;   // "Bronze", "Prata", "Ouro", etc.
+  quantity:    number;   // quantidade de cotas
+  price:       number;   // preço total (com desconto se houver)
+  highlight?:  boolean;  // destacar como "mais popular"
+  discount?:   number;   // % de desconto aplicado
+}
+
 export interface Raffle {
   id: string;
   title: string;
@@ -31,6 +40,8 @@ export interface Raffle {
   drawScheduledAt?: unknown;
   raffleCode?: string;  // código único ex: AZ-2026-A3B9
   category?: string;    // categoria da rifa
+  minQuantity?: number; // mínimo de cotas por compra (padrão: 1)
+  packages?: RafflePackage[]; // pacotes com desconto opcional
   deleted?: boolean;    // soft delete
 }
 
