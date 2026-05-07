@@ -336,6 +336,16 @@ export default function RaffleDetail({ user }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
         {/* ── LEFT ──────────────────────────────────────────────────── */}
         <div className="lg:col-span-8 space-y-8">
+
+          {/* Galeria de fotos — visível apenas no mobile (lg esconde pois está no sidebar) */}
+          {raffle.images?.filter(Boolean).length > 1 && (
+            <div className="block lg:hidden">
+              <ImageGallery
+                images={raffle.images.filter(Boolean)}
+                alt={raffle.title}
+              />
+            </div>
+          )}
           {/* Info */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -504,15 +514,18 @@ export default function RaffleDetail({ user }: Props) {
             animate={{ opacity: 1, x: 0 }}
             className="bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl overflow-hidden"
           >
-            <div className="relative h-52 sm:h-60">
-              <img src={img} alt={raffle.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
-              <div className="absolute top-4 left-4 flex items-center gap-2 bg-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl">
+            <div className="relative">
+              <ImageGallery
+                images={raffle.images?.filter(Boolean).length ? raffle.images.filter(Boolean) : [img]}
+                alt={raffle.title}
+                className="rounded-none"
+              />
+              <div className="absolute top-4 left-4 flex items-center gap-2 bg-indigo-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white shadow-xl z-10">
                 <Sparkles size={12} />
                 <span>Prêmio</span>
               </div>
               {raffle.isTest && (
-                <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-amber-500 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-slate-900">
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-amber-500 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase text-slate-900 z-10">
                   <FlaskConical size={12} />
                   TESTE
                 </div>
