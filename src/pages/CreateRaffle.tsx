@@ -202,7 +202,7 @@ export default function CreateRaffle({ user }: { user: User | null }) {
               <FieldWrap label="Pacotes de cotas (opcional)">
                 <p className="text-[10px] text-slate-500 mb-3">Crie pacotes com quantidade fixa e desconto. Se não criar, o participante escolhe livremente.</p>
                 <PackagesEditor
-                  pricePerUnit={parseFloat(pricePerNum) || 0}
+                  pricePerUnit={precoNum}
                   packages={packages}
                   onChange={setPackages}
                 />
