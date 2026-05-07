@@ -71,19 +71,34 @@ export const registerUser = async (
 };
 
 
-/** Confirma pedido como pago.
- * Os números já foram reservados na criação do pedido (transação atômica).
- * Esta função apenas muda o status para "paid".
+/** Confirma pedido como pago + garante números reservados.
+ * Dupla proteção: tenta confirmar via transação atômica.
  */
 export const confirmOrderAndReserve = async (
   orderId: string,
-  _raffleId: string,   // mantido para compatibilidade
-  _numbers: number[], // mantido para compatibilidade
+  raffleId: string,
+  numbers: number[],
   mpPaymentId?: string,
 ): Promise<void> => {
-  await updateDoc(doc(db, "orders", orderId), {
-    status: "paid",
-    ...(mpPaymentId ? { mpPaymentId } : {}),
+  const orderRef  = doc(db, "orders", orderId);
+  const raffleRef = doc(db, "raffles", raffleId);
+
+  await runTransaction(db, async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists()) return;
+    if (orderSnap.data().status === "paid") return; // idempotente
+
+    // Confirma pedido
+    tx.update(orderRef, {
+      status: "paid",
+      paidAt: serverTimestamp(),
+      ...(mpPaymentId ? { mpPaymentId } : {}),
+    });
+
+    // Garante números no soldNumbers (arrayUnion é seguro contra duplicatas)
+    if (numbers.length > 0) {
+      tx.update(raffleRef, { soldNumbers: arrayUnion(...numbers) });
+    }
   });
 };
 
