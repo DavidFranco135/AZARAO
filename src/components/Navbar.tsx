@@ -85,21 +85,45 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-slate-950 border-t border-slate-800 overflow-hidden"
           >
-            <div className="px-4 py-6 space-y-4">
-              <MobileLink to="/" label="Início" onClick={close} />
+            <div className="px-4 py-6 space-y-2">
+              <MobileLink to="/" label="Início" icon={<Ticket size={17}/>} onClick={close} />
+
               {user ? (
                 <>
-                  {isAdmin && <MobileLink to="/admin" label="Painel Admin" icon={<Shield size={17} className="text-amber-400" />} onClick={close} />}
-                  {isAdmin && <MobileLink to="/reports" label="Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />}
-                  {isCreatorOrAdmin && (
-                    <>
-                      <MobileLink to="/create-raffle" label="Criar Nova Rifa" icon={<PlusCircle size={17} className="text-indigo-400" />} onClick={close} />
-                      <MobileLink to="/dashboard" label="Dashboard" icon={<LayoutDashboard size={17} />} onClick={close} />
-                      <MobileLink to="/my-reports" label="Meus Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />
-                    </>
+                  {/* Admin */}
+                  {isAdmin && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-2 pb-1">Admin</p>
+                      <MobileLink to="/admin" label="Painel Admin" icon={<Shield size={17} className="text-amber-400" />} onClick={close} />
+                      <MobileLink to="/reports" label="Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />
+                    </div>
                   )}
-                  <MobileLink to="/my-orders" label="Meus Pedidos" icon={<ShoppingBag size={17} className="text-indigo-400" />} onClick={close} />
-                  <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+
+                  {/* Criador */}
+                  {isCreatorOrAdmin && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-2 pb-1">Criador</p>
+                      <MobileLink to="/dashboard" label="Dashboard" icon={<LayoutDashboard size={17} className="text-indigo-400" />} onClick={close} />
+                      <MobileLink to="/create-raffle" label="Criar Nova Rifa" icon={<PlusCircle size={17} className="text-indigo-400" />} onClick={close} />
+                      <MobileLink to="/my-reports" label="Meus Relatórios" icon={<BarChart3 size={17} className="text-emerald-400" />} onClick={close} />
+                    </div>
+                  )}
+
+                  {/* Participante */}
+                  <div className="space-y-2 pt-2">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-2 pb-1">Minha Conta</p>
+                    <MobileLink to="/my-orders" label="Meus Pedidos" icon={<ShoppingBag size={17} className="text-indigo-400" />} onClick={close} />
+                  </div>
+
+                  {/* Info */}
+                  <div className="space-y-2 pt-2">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest px-2 pb-1">Informações</p>
+                    <MobileLink to="/termos" label="Termos de Uso" onClick={close} />
+                    <MobileLink to="/privacidade" label="Privacidade" onClick={close} />
+                  </div>
+
+                  {/* User info + logout */}
+                  <div className="pt-4 mt-2 border-t border-slate-800 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-black text-indigo-400">
                         {user.name.charAt(0).toUpperCase()}
@@ -115,9 +139,13 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                   </div>
                 </>
               ) : (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <Link to="/login" onClick={close} className="flex items-center justify-center py-3 rounded-xl bg-slate-900 text-white font-bold text-sm border border-slate-800">Entrar</Link>
-                  <Link to="/register" onClick={close} className="flex items-center justify-center py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm">Cadastrar</Link>
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Link to="/login" onClick={close} className="flex items-center justify-center py-3 rounded-xl bg-slate-900 text-white font-bold text-sm border border-slate-800">Entrar</Link>
+                    <Link to="/register" onClick={close} className="flex items-center justify-center py-3 rounded-xl bg-indigo-600 text-white font-bold text-sm">Cadastrar</Link>
+                  </div>
+                  <MobileLink to="/termos" label="Termos de Uso" onClick={close} />
+                  <MobileLink to="/privacidade" label="Privacidade" onClick={close} />
                 </div>
               )}
             </div>
